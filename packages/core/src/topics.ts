@@ -10,6 +10,7 @@
  * Adding a topic: edit ONLY your domain's file (create `topics/<domain>.ts`
  * for a new domain and add its export line here).
  */
+export * from "./topics/iam";
 export * from "./topics/session";
 export * from "./topics/context";
 export * from "./topics/work";

@@ -61,9 +61,10 @@ describe("command table", () => {
   });
 });
 
+// `init` is REAL as of phase 1 (migrate + seed via runBunScript) — it is
+// covered by running it against a live database, not asserted here.
 describe("stubbed commands are loud", () => {
   const expected: Array<[name: string, stubId: string]> = [
-    ["init", "cli.init"],
     ["eval", "cli.eval"],
     ["new:connector", "cli.new.connector"],
     ["new:skill", "cli.new.skill"],

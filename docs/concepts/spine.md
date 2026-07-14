@@ -21,10 +21,11 @@ deferred (`TODOS.md`).
 
 Topics are dot-namespaced and MUST be registered via `defineEventType()` —
 emitting an unregistered topic is a bug (`validateEventPayload` throws). The
-catalog lives in `packages/core/src/topics.ts`:
+catalog lives in `packages/core/src/topics/` (one file per domain):
 
 | Area | Topics |
 |------|--------|
+| iam | `iam.tenant.created` · `iam.principal.created` |
 | sessions | `session.started` · `session.ended` |
 | context | `context.blob.created` · `context.doc.created` · `context.doc.distilled` · `context.entity.created` · `context.link.created` |
 | work | `work.item.opened` · `work.item.status_changed` · `work.note.added` |
@@ -45,11 +46,15 @@ carry only what subscribers need without a fetch.
 State lives in Postgres (schema-per-module, row-level tenancy). Every mutation
 writes its Event rows **in the same transaction** — the transactional outbox.
 The dispatcher (orchestrator role) delivers events to durable,
-cursor-checkpointed, at-least-once subscriptions. Locally it rides
-LISTEN/NOTIFY; on GCP a `SpineDriver` adapter maps to Pub/Sub (the adapter is
-the only place that knows — no cloud SDK imports outside `deploy/`).
+cursor-checkpointed, at-least-once subscriptions (cursors are per consumer per
+tenant; consumers must be idempotent, and a failing handler blocks its own
+cursor with exponential backoff — never other consumers). Locally it polls the
+outbox (300ms + an in-process wake right after each append; LISTEN/NOTIFY is a
+deferred latency optimization — Bun's SQL client doesn't expose it yet); on
+GCP a `SpineDriver` adapter maps to Pub/Sub (the adapter is the only place
+that knows — no cloud SDK imports outside `deploy/`).
 
-The interface (`EventSpine`, stubbed in `apps/server/src/spine`):
+The interface (`EventSpine`, implemented in `apps/server/src/spine`):
 
 ```ts
 append(tx: DbTx, e: NewEvent): Promise<Event>;        // transactional outbox

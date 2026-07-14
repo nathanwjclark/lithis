@@ -25,6 +25,18 @@ create table if not exists spine.events (
 create index if not exists events_tenant_topic_seq on spine.events (tenant_id, topic, seq);
 create index if not exists events_correlation on spine.events (correlation_id) where correlation_id is not null;
 
+-- Per-tenant seq counter, upserted INSIDE the appending transaction. The row
+-- lock serializes appends per tenant, which buys two load-bearing guarantees:
+-- gapless seq, and per-tenant commit order == seq order — so cursor scans
+-- (seq > after_seq) can never skip an event that commits late. Also doubles
+-- as the dispatcher's tenant discovery (spine-owned; no cross-module reads).
+create table if not exists spine.tenant_seq (
+  tenant_id  text primary key,
+  last_seq   bigint not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- Durable at-least-once subscription checkpoints (one row per consumer).
 create table if not exists spine.consumer_cursors (
   consumer_id text not null,

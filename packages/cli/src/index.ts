@@ -48,11 +48,12 @@ const DEV_INSTRUCTIONS = `lithis dev — local development
 export const COMMANDS: readonly CliCommand[] = [
   {
     name: "init",
-    description: "Scaffold a new lithis workspace (tenant, env file, compose overrides)",
-    handler: stub<CommandHandler>(
-      "cli.init",
-      "LITHIS-STUB: workspace scaffolding not implemented — lands with the spine + iam build-out",
-    ),
+    description: "Initialize the local workspace: run migrations, seed the dev tenant + principal",
+    handler: (_args) => {
+      const migrated = runBunScript("apps/server/src/db/migrate.ts", []);
+      if (migrated !== 0) return migrated;
+      return runBunScript("apps/server/src/iam/seed.ts", []);
+    },
   },
   {
     name: "dev",

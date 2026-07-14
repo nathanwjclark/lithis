@@ -4,10 +4,12 @@ Ten minutes from clone to a running (and honestly-labeled) lithis stack.
 
 ## What lithis is right now
 
-lithis is currently a **skeleton**: the data model, event topics, state
-machines, and service interfaces are real and tested; most service
-implementations are declared stubs that **fail loudly** when invoked. Nothing
-pretends to work. Every unimplemented path is registered through
+lithis is a **skeleton growing real organs** (see `docs/phases.md` for the
+build-out tracker): the data model, event topics, state machines, and service
+interfaces are real and tested; the event spine (transactional outbox +
+dispatcher + clock), migrations, and iam identity are implemented; the
+remaining services are declared stubs that **fail loudly** when invoked.
+Nothing pretends to work. Every unimplemented path is registered through
 `@lithis/stubkit`, throws `NotImplementedError` on use, and is enumerable at
 runtime — so you always know exactly what is real.
 
@@ -44,6 +46,14 @@ This starts four services:
 | minio    | Object storage (blobs)        | localhost:9000 / 9001  |
 | server   | lithis server, `LITHIS_ROLE=all` | http://localhost:4400 |
 | portal   | React admin portal            | http://localhost:4401  |
+
+The server applies migrations on boot. To seed a dev tenant + principal (and
+get ready-to-paste `x-lithis-tenant` / `x-lithis-principal` identity headers
+for the API):
+
+```bash
+bun packages/cli/src/cli.ts init    # migrate + seed; idempotent
+```
 
 ## 3. What you see
 

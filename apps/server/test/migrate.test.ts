@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { NotImplementedError } from "@lithis/stubkit";
-import { applyMigrations, collectMigrations, MODULE_ORDER } from "../src/db/migrate";
+import { collectMigrations, MODULE_ORDER } from "../src/db/migrate";
 
 /** Modules that own tables in the skeleton. */
 const MODULES_WITH_MIGRATIONS = [
@@ -107,16 +106,5 @@ describe("collectMigrations (real filesystem)", () => {
   });
 });
 
-describe("applyMigrations", () => {
-  test("is a registered stub that throws NotImplementedError", () => {
-    expect(() =>
-      applyMigrations("postgres://localhost/lithis", collectMigrations()),
-    ).toThrow(NotImplementedError);
-    try {
-      applyMigrations("postgres://localhost/lithis", []);
-    } catch (err) {
-      expect(err).toBeInstanceOf(NotImplementedError);
-      expect((err as NotImplementedError).stubId).toBe("server.db.migrate.apply");
-    }
-  });
-});
+// applyMigrations is REAL as of phase 1 — behavioral coverage (fresh apply,
+// idempotent re-run, checksum drift) lives in test/integration/migrate.pg.test.ts.
