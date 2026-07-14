@@ -23,8 +23,13 @@
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@typescript-eslint/parser": "^8.18.0",
     "eslint": "^9.17.0",
+    "hono": "^4.12.30",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^5.7.0"
   }
 }

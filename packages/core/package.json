@@ -1,0 +1,14 @@
+{
+  "name": "@lithis/core",
+  "private": true,
+  "version": "0.0.1",
+  "description": "All lithis record schemas (zod-first): refs, origin, sessions, iam, context, work, processes, runs/evidence, humangate, spine events, connectivity, skills, artifacts, SoR.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  }
+}
