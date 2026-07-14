@@ -26,6 +26,10 @@ export const connectionSchema = z.object({
   syncState: z.object({
     /** Per-feed opaque cursors (gmail historyId, sftp mtime watermark, ...). */
     cursorsByFeed: z.record(z.string()),
+    /** When the sync loop last ATTEMPTED this connection (success or failure). */
+    lastSyncAt: isoDateTimeSchema.optional(),
+    /** The last sync attempt's failure, cleared on the next success. */
+    lastError: z.string().optional(),
   }),
 });
 export type Connection = z.infer<typeof connectionSchema>;
