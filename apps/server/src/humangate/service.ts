@@ -20,11 +20,10 @@ import type { FollowUpAction, HumanGate, InboxFilter, NewHumanRequest } from "./
  * the row or not at all. HUMAN_REQUEST_TRANSITIONS (core) is the law for what
  * moves are legal; the SLA sweep policy lives in ./sla.ts.
  *
- * Supersession (pending/approved/modified → superseded) is deliberately NOT
- * exposed here: per docs/concepts/human-gate.md it is the Invalidator's move
- * when a cascade invalidates the thing that was approved, and the Invalidator
- * lands with P8-process. The humangate.superseded topic is registered and
- * waiting.
+ * Supersession (pending/approved/modified → superseded) is the Invalidator's
+ * move (P8-process): supersedeForSubject flips every live/granted request
+ * about a subject when a cascade repudiates it — per
+ * docs/concepts/human-gate.md it is never a resolution verdict.
  */
 
 export class HumanRequestNotFoundError extends Error {
@@ -197,6 +196,43 @@ export function createPgHumanGate(db: Db, spine: EventSpine): HumanGate {
         if (f?.kinds !== undefined && !f.kinds.includes(r.kind)) return false;
         if (f?.subjectKinds !== undefined && !f.subjectKinds.includes(r.subjectKind)) return false;
         return assigneeMatches(r.routing.assignee, p);
+      });
+    },
+
+    async supersedeForSubject(tenantId: Ulid, subject: Ref, causeEventId?: Ulid): Promise<Ulid[]> {
+      return await db.withTx(async (tx) => {
+        const sql = txSql(tx);
+        const rows: { id: string; state: string }[] = await sql`
+          select id, state from humangate.human_requests
+          where tenant_id = ${tenantId}
+            and subject_ref = ${JSON.stringify(subject)}::text::jsonb
+            and state in ('pending', 'approved', 'modified')
+          order by id
+          for update`;
+        const at = nowIso();
+        const superseded: Ulid[] = [];
+        for (const row of rows) {
+          assertTransition(
+            HUMAN_REQUEST_TRANSITIONS,
+            row.state as HumanRequest["state"],
+            "superseded",
+            "human request",
+          );
+          await sql`
+            update humangate.human_requests
+            set state = 'superseded', updated_at = ${at}
+            where id = ${row.id}`;
+          await spine.append(tx, {
+            tenantId,
+            topic: "humangate.superseded",
+            subjectRefs: [{ kind: "human_request", id: row.id }, subject],
+            actor: { kind: "tenant", id: tenantId },
+            severity: "warning",
+            payload: { ...(causeEventId !== undefined ? { causeEventId } : {}) },
+          });
+          superseded.push(row.id);
+        }
+        return superseded;
       });
     },
 

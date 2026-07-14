@@ -3,6 +3,7 @@ import type {
   HumanResolution,
   IsoDateTime,
   PrincipalContext,
+  Ref,
   Ulid,
 } from "@lithis/core";
 import type { Db } from "../db";
@@ -45,6 +46,12 @@ export interface HumanGate {
   /** Validates the HUMAN_REQUEST_TRANSITIONS table; deny/modify triggers the Invalidator. */
   resolve(id: Ulid, res: HumanResolution, by: PrincipalContext): Promise<HumanRequest>;
   inbox(p: PrincipalContext, f?: InboxFilter): Promise<HumanRequest[]>;
+  /**
+   * The Invalidator's move (P8-process): every pending/approved/modified
+   * request about `subject` flips to `superseded` (original approvers are
+   * notified via humangate.superseded). Returns the superseded request ids.
+   */
+  supersedeForSubject(tenantId: Ulid, subject: Ref, causeEventId?: Ulid): Promise<Ulid[]>;
   /** Internal-responder SLA only — called by the spine clock. */
   tick(now: Date): Promise<FollowUpAction[]>;
 }
