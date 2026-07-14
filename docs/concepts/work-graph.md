@@ -61,8 +61,14 @@ No external broker: workers claim `ready` items with
 `FOR UPDATE SKIP LOCKED`, hold a lease
 (`{ holderPrincipalId, runId, expiresAt, heartbeatAt }`), and heartbeat it.
 Expired leases return items to `ready` with `attempt` intact. The `WorkQueue`
-interface (stubbed in `apps/server/src/work`):
-`open · claim · heartbeat · release · complete · addNote`.
+interface (implemented in `apps/server/src/work` as of P5-work):
+`open · claim · heartbeat · release · complete · addNote`. The
+`work.lease-reclaim` TickSource (registered on the clock) reclaims expired
+leases and flips due `wakeAt` sleepers pending→ready; an expired lease is dead
+for its holder even before the tick notices. Still stubbed/deferred:
+recurring-schedule minting of oneoff children (clock cron work) and any
+WorkEdge queue surface — the `work_edges` table ships, but pending→ready on
+`depends_on` completion lands with P8-process.
 
 ## Follow-ups are not approvals
 
