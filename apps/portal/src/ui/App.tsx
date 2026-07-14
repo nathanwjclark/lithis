@@ -46,6 +46,22 @@ const CSS = `
            border: 1px solid transparent; }
   button.approve { background: #1668c7; color: #fff; }
   button.deny { background: #fff; color: #b3261e; border-color: #d8b4b1; }
+  button.neutral { background: #fff; color: #1a1d21; border-color: #c3cad2; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.request-row { display: block; width: 100%; text-align: left; font: inherit;
+                       cursor: pointer; }
+  button.request-row:hover { border-color: #9fb4c8; }
+  .toggle { font-size: 13px; color: #6b7480; display: inline-flex; align-items: center; gap: 6px; }
+  .state { font-weight: 600; }
+  .state-pending { color: #8a6100; }
+  .state-approved, .state-answered, .state-acknowledged { color: #1a7f37; }
+  .state-denied, .state-expired { color: #b3261e; }
+  .state-modified, .state-superseded { color: #6b7480; }
+  pre.payload { background: #f0f2f4; border: 1px solid #e2e6ea; border-radius: 6px;
+                padding: 10px 12px; font-size: 12.5px; overflow-x: auto; margin: 6px 0 0; }
+  textarea.comment { width: 100%; min-height: 64px; font: inherit; font-size: 13px;
+                     border: 1px solid #c3cad2; border-radius: 6px; padding: 8px 10px;
+                     margin-top: 4px; resize: vertical; }
 `;
 
 function useHashRoute(): string {

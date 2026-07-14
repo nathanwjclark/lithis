@@ -20,7 +20,8 @@ export function StubsPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchCensus(base)
+    // Same-origin: the portal proxies /stubs to the lithis server (no CORS there).
+    fetchCensus("")
       .then((census) => {
         if (!cancelled) setState({ phase: "loaded", census });
       })

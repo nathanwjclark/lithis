@@ -21,7 +21,8 @@ export function NotBuilt({ section }: { section: Section }) {
   useEffect(() => {
     let cancelled = false;
     setState({ phase: "loading" });
-    fetchCensus(base)
+    // Same-origin: the portal proxies /stubs to the lithis server (no CORS there).
+    fetchCensus("")
       .then((census) => {
         if (cancelled) return;
         setState({
