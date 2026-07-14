@@ -1,0 +1,13 @@
+{
+  "name": "@lithis/stubscan",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Static stub census + honesty gate: verifies every stub carries the LITHIS-STUB token, bans silent TODO-throws and inline dummy data, and emits the census CI artifact.",
+  "type": "module",
+  "bin": {
+    "stubscan": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/scan.ts"
+  }
+}

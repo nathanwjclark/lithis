@@ -1,0 +1,30 @@
+{
+  "name": "lithis",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Open-source AI tools for companies: unified context, resident agents, process orchestration, and the operational scaffolding around them.",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "tooling/*",
+    "packages/*",
+    "apps/*",
+    "extensions/connectors/*",
+    "extensions/skills/*",
+    "extensions/packs/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "lint": "eslint .",
+    "stubscan": "bun tooling/stubscan/src/cli.ts",
+    "dev:server": "bun apps/server/src/main.ts",
+    "dev:portal": "bun apps/portal/src/main.ts",
+    "check": "bun run typecheck && bun test && bun run stubscan && bun run lint"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,69 @@
+# lithis local development stack.
+#   docker compose up
+# Postgres (with pgvector), MinIO (object storage), the server (role=all), the portal.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: lithis
+      POSTGRES_PASSWORD: lithis-local # local dev only — never reuse anywhere
+      POSTGRES_DB: lithis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lithis"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: lithis
+      MINIO_ROOT_PASSWORD: lithis-local # local dev only
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.server
+    environment:
+      LITHIS_ROLE: all
+      DATABASE_URL: postgres://lithis:lithis-local@postgres:5432/lithis
+      OBJECT_STORE_URL: http://lithis:lithis-local@minio:9000
+      PORT: "4400"
+    ports:
+      - "4400:4400"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  portal:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.portal
+    environment:
+      LITHIS_SERVER_URL: http://server:4400
+      PORT: "4401"
+    ports:
+      - "4401:4401"
+    depends_on:
+      - server
+
+volumes:
+  pgdata:
+  miniodata:

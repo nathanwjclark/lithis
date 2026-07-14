@@ -1,0 +1,7 @@
+{
+  "name": "@lithis/tsconfig",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Shared strict TypeScript configuration for the lithis monorepo.",
+  "files": ["base.json"]
+}
