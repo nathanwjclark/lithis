@@ -78,5 +78,10 @@ Links × RelationshipScores for "who can introduce me to X".
 
 ## The interface
 
-`ContextStore` (stubbed in `apps/server/src/context`):
-`putBlob · ingestDoc · distill · search · paths`.
+`ContextStore` (implemented in `apps/server/src/context` as of P4-context):
+`putBlob · ingestDoc · distill · search · paths`. Blob bytes live behind a
+`BlobStorage` seam (local directory by default; Bun.s3 when `OBJECT_STORE_URL`
+is set); embeddings behind an `EmbeddingProvider` seam (OpenAI
+`text-embedding-3-small` when `OPENAI_API_KEY` is set, else FTS-only search);
+hybrid results are merged with weighted reciprocal-rank fusion. `distill`
+requires `ANTHROPIC_API_KEY` (model via `LITHIS_DISTILL_MODEL`).
