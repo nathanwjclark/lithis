@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "channel": "C0100ALPHA1",
+  "ts": "1718300000.000900",
+  "message": {
+    "user": "U0900BOTUS9",
+    "type": "message",
+    "ts": "1718300000.000900",
+    "bot_id": "B0900BOTBB9",
+    "app_id": "A0900APPAA9",
+    "text": "Evidence card: HR-42 awaiting approval",
+    "team": "T0100TEAM01",
+    "bot_profile": {
+      "id": "B0900BOTBB9",
+      "app_id": "A0900APPAA9",
+      "name": "lithis",
+      "deleted": false,
+      "updated": 1717000000,
+      "team_id": "T0100TEAM01"
+    },
+    "blocks": [
+      {
+        "type": "section",
+        "block_id": "ev1",
+        "text": { "type": "mrkdwn", "text": "*Evidence card:* HR-42 awaiting approval", "verbatim": false }
+      }
+    ]
+  }
+}

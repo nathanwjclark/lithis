@@ -1,0 +1,36 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "type": "message",
+      "user": "U0100ALICE1",
+      "text": "",
+      "files": [
+        {
+          "id": "F0600FILES6",
+          "name": "loss-runs-2026-06.csv",
+          "mimetype": "text/csv",
+          "filetype": "csv",
+          "size": 24816,
+          "url_private": "https://files.slack.com/files-pri/T0100TEAM01-F0600FILES6/loss-runs-2026-06.csv"
+        }
+      ],
+      "upload": true,
+      "subtype": "file_share",
+      "ts": "1718200500.000700",
+      "team": "T0100TEAM01"
+    },
+    {
+      "type": "message",
+      "user": "U0200BOBBY2",
+      "text": "Connector cursor design LGTM — durable per-channel watermarks, exclusive oldest.",
+      "ts": "1718200000.000600",
+      "team": "T0100TEAM01"
+    }
+  ],
+  "has_more": false,
+  "pin_count": 1,
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}

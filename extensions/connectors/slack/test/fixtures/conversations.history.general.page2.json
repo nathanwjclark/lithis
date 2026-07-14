@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "type": "message",
+      "subtype": "bot_message",
+      "bot_id": "B0500ROBOT5",
+      "username": "deploybot",
+      "text": "Deploy 2026-06-10 finished: 14 services green.",
+      "ts": "1718050000.000200",
+      "team": "T0100TEAM01"
+    },
+    {
+      "type": "message",
+      "subtype": "channel_join",
+      "user": "U0300CAROL3",
+      "text": "<@U0300CAROL3> has joined the channel",
+      "ts": "1718040000.000150",
+      "inviter": "U0100ALICE1"
+    }
+  ],
+  "has_more": false,
+  "pin_count": 0,
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}
