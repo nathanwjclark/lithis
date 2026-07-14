@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "type": "message",
+      "user": "U0200BOBBY2",
+      "text": "Draft of the Q3 loss-run summary is up — <https://example.com/doc|here>. Feedback by Friday please.",
+      "ts": "1718100300.000400",
+      "team": "T0100TEAM01",
+      "thread_ts": "1718100000.000100",
+      "parent_user_id": "U0100ALICE1",
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "b1",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                { "type": "text", "text": "Draft of the Q3 loss-run summary is up — " },
+                { "type": "link", "url": "https://example.com/doc", "text": "here" },
+                { "type": "text", "text": ". Feedback by Friday please." }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "user": "U0100ALICE1",
+      "text": "Kicking off the quarterly review thread — drop updates below.",
+      "ts": "1718100000.000100",
+      "team": "T0100TEAM01",
+      "thread_ts": "1718100000.000100",
+      "reply_count": 1,
+      "reply_users_count": 1,
+      "latest_reply": "1718100300.000400",
+      "reply_users": ["U0200BOBBY2"],
+      "is_locked": false,
+      "subscribed": false
+    }
+  ],
+  "has_more": true,
+  "pin_count": 0,
+  "channel_actions_ts": null,
+  "channel_actions_count": 0,
+  "response_metadata": {
+    "next_cursor": "bmV4dF90czoxNzE4MDUwMDAwMDAwMjAw"
+  }
+}

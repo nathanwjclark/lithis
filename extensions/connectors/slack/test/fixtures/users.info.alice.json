@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "user": {
+    "id": "U0100ALICE1",
+    "team_id": "T0100TEAM01",
+    "name": "alice",
+    "deleted": false,
+    "color": "9f69e7",
+    "real_name": "Alice Nguyen",
+    "tz": "America/New_York",
+    "tz_label": "Eastern Daylight Time",
+    "tz_offset": -14400,
+    "profile": {
+      "title": "Head of Ops",
+      "real_name": "Alice Nguyen",
+      "real_name_normalized": "Alice Nguyen",
+      "display_name": "alice",
+      "display_name_normalized": "alice",
+      "email": "alice@example.com",
+      "team": "T0100TEAM01"
+    },
+    "is_admin": true,
+    "is_owner": true,
+    "is_primary_owner": true,
+    "is_restricted": false,
+    "is_ultra_restricted": false,
+    "is_bot": false,
+    "is_app_user": false,
+    "updated": 1717000000
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "ok": true,
+  "user": {
+    "id": "U0200BOBBY2",
+    "team_id": "T0100TEAM01",
+    "name": "bob",
+    "deleted": false,
+    "color": "e7392d",
+    "real_name": "Bob Okafor",
+    "tz": "America/Chicago",
+    "tz_label": "Central Daylight Time",
+    "tz_offset": -18000,
+    "profile": {
+      "title": "Underwriting Lead",
+      "real_name": "Bob Okafor",
+      "real_name_normalized": "Bob Okafor",
+      "display_name": "",
+      "display_name_normalized": "",
+      "email": "bob@example.com",
+      "team": "T0100TEAM01"
+    },
+    "is_admin": false,
+    "is_owner": false,
+    "is_bot": false,
+    "is_app_user": false,
+    "updated": 1717100000
+  }
+}

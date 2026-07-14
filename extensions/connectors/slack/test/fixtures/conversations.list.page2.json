@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "channels": [
+    {
+      "id": "C0300CHRLE3",
+      "name": "proj-lithis",
+      "is_channel": false,
+      "is_group": true,
+      "is_im": false,
+      "created": 1717500000,
+      "creator": "U0200BOBBY2",
+      "is_archived": false,
+      "is_general": false,
+      "name_normalized": "proj-lithis",
+      "is_shared": false,
+      "context_team_id": "T0100TEAM01",
+      "is_member": true,
+      "is_private": true,
+      "is_mpim": false,
+      "topic": { "value": "lithis build-out", "creator": "U0200BOBBY2", "last_set": 1717500100 },
+      "purpose": { "value": "Private project channel", "creator": "U0200BOBBY2", "last_set": 1717500100 },
+      "previous_names": [],
+      "num_members": 4
+    },
+    {
+      "id": "C0400DELTA4",
+      "name": "old-initiative",
+      "is_channel": true,
+      "is_group": false,
+      "is_im": false,
+      "created": 1710000000,
+      "creator": "U0100ALICE1",
+      "is_archived": true,
+      "is_general": false,
+      "name_normalized": "old-initiative",
+      "is_shared": false,
+      "context_team_id": "T0100TEAM01",
+      "is_member": true,
+      "is_private": false,
+      "is_mpim": false,
+      "topic": { "value": "", "creator": "", "last_set": 0 },
+      "purpose": { "value": "", "creator": "", "last_set": 0 },
+      "previous_names": [],
+      "num_members": 3
+    }
+  ],
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "ok": true,
+  "channels": [
+    {
+      "id": "C0100ALPHA1",
+      "name": "general",
+      "is_channel": true,
+      "is_group": false,
+      "is_im": false,
+      "created": 1717000000,
+      "creator": "U0100ALICE1",
+      "is_archived": false,
+      "is_general": true,
+      "unlinked": 0,
+      "name_normalized": "general",
+      "is_shared": false,
+      "is_ext_shared": false,
+      "is_org_shared": false,
+      "is_pending_ext_shared": false,
+      "pending_shared": [],
+      "context_team_id": "T0100TEAM01",
+      "parent_conversation": null,
+      "is_member": true,
+      "is_private": false,
+      "is_mpim": false,
+      "topic": {
+        "value": "Company-wide announcements and work-based matters",
+        "creator": "U0100ALICE1",
+        "last_set": 1717000100
+      },
+      "purpose": {
+        "value": "This channel is for workspace-wide communication.",
+        "creator": "U0100ALICE1",
+        "last_set": 1717000100
+      },
+      "previous_names": [],
+      "num_members": 12
+    },
+    {
+      "id": "C0200BRAVO2",
+      "name": "random",
+      "is_channel": true,
+      "is_group": false,
+      "is_im": false,
+      "created": 1717000000,
+      "creator": "U0100ALICE1",
+      "is_archived": false,
+      "is_general": false,
+      "name_normalized": "random",
+      "is_shared": false,
+      "context_team_id": "T0100TEAM01",
+      "is_member": false,
+      "is_private": false,
+      "is_mpim": false,
+      "topic": { "value": "Non-work banter", "creator": "U0100ALICE1", "last_set": 1717000200 },
+      "purpose": { "value": "A place for non-work stuff", "creator": "U0100ALICE1", "last_set": 1717000200 },
+      "previous_names": [],
+      "num_members": 11
+    }
+  ],
+  "response_metadata": {
+    "next_cursor": "dGVhbTpDMDMwMENIQVJMSTM="
+  }
+}
