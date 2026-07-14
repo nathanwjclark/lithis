@@ -96,9 +96,9 @@ export function createPgEventSpine(db: Db): EventSpineRuntime {
          causation_id, correlation_id, severity, at)
       values
         (${id}, ${e.tenantId}, ${seq}, ${e.topic},
-         ${JSON.stringify(e.subjectRefs)}::jsonb,
-         ${e.payload === undefined ? null : JSON.stringify(e.payload)}::jsonb,
-         ${JSON.stringify(e.actor)}::jsonb,
+         ${JSON.stringify(e.subjectRefs)}::text::jsonb,
+         ${e.payload === undefined ? null : JSON.stringify(e.payload)}::text::jsonb,
+         ${JSON.stringify(e.actor)}::text::jsonb,
          ${e.causationId ?? null}, ${e.correlationId ?? null},
          ${e.severity ?? null}, ${at})`;
     // Fast-path nudge for same-process consumers; the poll remains the truth.
@@ -161,7 +161,7 @@ export function createPgEventSpine(db: Db): EventSpineRuntime {
 
     await db.sql`
       insert into spine.consumer_cursors (consumer_id, tenant_id, after_seq, selector)
-      values (${sub.consumerId}, ${tenantId}, 0, ${JSON.stringify(sub.selector)}::jsonb)
+      values (${sub.consumerId}, ${tenantId}, 0, ${JSON.stringify(sub.selector)}::text::jsonb)
       on conflict (consumer_id, tenant_id) do nothing`;
     const cursorRows: { after_seq: bigint | number }[] = await db.sql`
       select after_seq from spine.consumer_cursors
