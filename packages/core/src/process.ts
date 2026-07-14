@@ -128,5 +128,7 @@ export const cascadePlanSchema = z.object({
   /** Transitive depends_on dependents that go stale. */
   affected: z.array(z.string()),
   width: z.number().int().nonnegative(),
+  /** The triggering spine event, threaded through to humangate.superseded payloads. */
+  causeEventId: ulidSchema.optional(),
 });
 export type CascadePlan = z.infer<typeof cascadePlanSchema>;

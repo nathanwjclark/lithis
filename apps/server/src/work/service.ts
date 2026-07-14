@@ -3,10 +3,20 @@ import {
   assertTransition,
   newUlid,
   nowIso,
+  workEdgeSchema,
   workItemSchema,
   workNoteSchema,
 } from "@lithis/core";
-import type { PrincipalContext, RunOutcome, WorkItem, WorkItemLease, WorkItemStatus } from "@lithis/core";
+import type {
+  PrincipalContext,
+  Ref,
+  RunOutcome,
+  Ulid,
+  WorkEdge,
+  WorkItem,
+  WorkItemLease,
+  WorkItemStatus,
+} from "@lithis/core";
 import { txSql } from "../db";
 import type { Db, DbTx } from "../db";
 import type { EventSpine, TickSource } from "../spine";
@@ -16,6 +26,8 @@ import type {
   Lease,
   NewWorkItem,
   NewWorkNote,
+  OpenOptions,
+  WorkGraph,
   WorkItemId,
   WorkQueue,
   WorkQueueOptions,
@@ -30,9 +42,14 @@ import type {
  * pending→ready. Every transition is validated against WORK_ITEM_TRANSITIONS
  * and emits work.item.status_changed via the transactional outbox.
  *
+ * P8-process: the WorkEdge surface is live — open(…, { dependsOn }) parks an
+ * item `pending` behind unfinished upstreams; done-completion (complete or
+ * resolveApproval) promotes pending/stale dependents whose upstreams are all
+ * done, in the same transaction. markStale/revive/demote/revokeLease/cancel
+ * are the Invalidator's moves (processes module).
+ *
  * NOT here (deliberately): recurring-schedule minting of oneoff children
- * (clock cron work, deferred past P5) and any WorkEdge surface (the table
- * ships; pending→ready on depends_on completion is P8-process).
+ * (clock cron work, deferred past P5).
  */
 
 const DEFAULT_LEASE_TTL_MS = 5 * 60_000;
@@ -48,6 +65,65 @@ interface LeaseOpRow {
 /** Bun's SQL client returns jsonb columns as JSON text — parse before zod. */
 function fromJsonb(value: unknown): unknown {
   return typeof value === "string" ? JSON.parse(value) : value;
+}
+
+interface WorkItemRow {
+  id: string;
+  tenant_id: string;
+  kind: string;
+  title: string;
+  body: string;
+  status: string;
+  owner_principal_id: string;
+  priority: string | number; // numeric comes back as text
+  due_at: Date | string | null;
+  wake_at: Date | string | null;
+  schedule: string | null;
+  follow_up: unknown;
+  process_run_id: string | null;
+  node_key: string | null;
+  attempt: number;
+  lease: unknown;
+  source_refs: unknown;
+  revision: number;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function rowToWorkItem(row: WorkItemRow): WorkItem {
+  return workItemSchema.parse({
+    id: row.id,
+    tenantId: row.tenant_id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    status: row.status,
+    ownerPrincipalId: row.owner_principal_id,
+    priority: Number(row.priority),
+    ...(row.due_at !== null ? { dueAt: toIso(row.due_at) } : {}),
+    ...(row.wake_at !== null ? { wakeAt: toIso(row.wake_at) } : {}),
+    ...(row.schedule !== null ? { schedule: row.schedule } : {}),
+    ...(row.follow_up !== null ? { followUp: fromJsonb(row.follow_up) } : {}),
+    ...(row.process_run_id !== null ? { processRunId: row.process_run_id } : {}),
+    ...(row.node_key !== null ? { nodeKey: row.node_key } : {}),
+    attempt: row.attempt,
+    ...(row.lease !== null ? { lease: fromJsonb(row.lease) } : {}),
+    sourceRefs: fromJsonb(row.source_refs),
+    revision: row.revision,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  });
+}
+
+class WorkItemNotFoundError extends Error {
+  constructor(op: string, id: string) {
+    super(`${op}: work item ${id} does not exist`);
+    this.name = "WorkItemNotFoundError";
+  }
 }
 
 export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOptions): WorkQueue {
@@ -73,51 +149,78 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
     from: WorkItemStatus,
     to: WorkItemStatus,
     attempt: number,
-    actorPrincipalId: string,
+    actor: Ref | string,
   ): Promise<void> {
     await spine.append(tx, {
       tenantId: row.tenant_id,
       topic: "work.item.status_changed",
       subjectRefs: [{ kind: "work_item", id: row.id }],
-      actor: { kind: "principal", id: actorPrincipalId },
+      actor: typeof actor === "string" ? { kind: "principal", id: actor } : actor,
       payload: { from, to, attempt },
     });
   }
 
-  return {
-    async get(id: WorkItemId): Promise<WorkItem | null> {
-      const rows: Record<string, unknown>[] = await db.sql`
-        select * from work.work_items where id = ${id}`;
-      const row = rows[0];
-      if (row === undefined) return null;
-      const toIso = (v: unknown): unknown => (v instanceof Date ? v.toISOString() : v);
-      return workItemSchema.parse({
-        id: row["id"],
-        tenantId: row["tenant_id"],
-        kind: row["kind"],
-        title: row["title"],
-        body: row["body"],
-        status: row["status"],
-        ownerPrincipalId: row["owner_principal_id"],
-        priority: Number(row["priority"]),
-        ...(row["due_at"] !== null ? { dueAt: toIso(row["due_at"]) } : {}),
-        ...(row["wake_at"] !== null ? { wakeAt: toIso(row["wake_at"]) } : {}),
-        ...(row["schedule"] !== null ? { schedule: row["schedule"] } : {}),
-        ...(row["follow_up"] !== null ? { followUp: fromJsonb(row["follow_up"]) } : {}),
-        ...(row["process_run_id"] !== null ? { processRunId: row["process_run_id"] } : {}),
-        ...(row["node_key"] !== null ? { nodeKey: row["node_key"] } : {}),
-        attempt: row["attempt"],
-        ...(row["lease"] !== null ? { lease: fromJsonb(row["lease"]) } : {}),
-        sourceRefs: fromJsonb(row["source_refs"]),
-        revision: row["revision"],
-        createdAt: toIso(row["created_at"]),
-        updatedAt: toIso(row["updated_at"]),
-      });
-    },
+  /** Lock the item row for a direct (non-lease) transition. */
+  async function lockItem(tx: DbTx, id: WorkItemId, op: string): Promise<WorkItemRow> {
+    const rows: WorkItemRow[] = await txSql(tx)`
+      select * from work.work_items where id = ${id} for update`;
+    const row = rows[0];
+    if (row === undefined) throw new WorkItemNotFoundError(op, id);
+    return row;
+  }
 
-    async open(item: NewWorkItem): Promise<WorkItemId> {
+  /** True when every depends_on upstream of the item is done. */
+  async function upstreamsDone(tx: DbTx, id: WorkItemId): Promise<boolean> {
+    const unmet: unknown[] = await txSql(tx)`
+      select 1 from work.work_edges e
+      join work.work_items u on u.id = e.to_id
+      where e.from_id = ${id} and e.verb = 'depends_on' and u.status <> 'done'
+      limit 1`;
+    return unmet.length === 0;
+  }
+
+  /**
+   * Apply a validated transition + emit its event. Clears the lease when the
+   * target is not claimed/running (a lease only rides live executions).
+   */
+  async function transitionLocked(
+    tx: DbTx,
+    row: WorkItemRow,
+    to: WorkItemStatus,
+    actor: Ref | string,
+  ): Promise<void> {
+    const from = row.status as WorkItemStatus;
+    assertTransition(WORK_ITEM_TRANSITIONS, from, to, "work item");
+    await txSql(tx)`
+      update work.work_items
+      set status = ${to}, lease = null, revision = revision + 1, updated_at = ${nowIso()}
+      where id = ${row.id}`;
+    await emitStatusChanged(tx, row, from, to, row.attempt, actor);
+  }
+
+  /**
+   * After an item reached `done`: dependents sitting pending/stale whose
+   * depends_on upstreams are now ALL done flip to ready (same transaction).
+   */
+  async function promoteDependents(tx: DbTx, id: WorkItemId, actor: Ref | string): Promise<void> {
+    const dependents: WorkItemRow[] = await txSql(tx)`
+      select w.* from work.work_edges e
+      join work.work_items w on w.id = e.from_id
+      where e.to_id = ${id} and e.verb = 'depends_on' and w.status in ('pending', 'stale')
+      order by w.id
+      for update of w`;
+    for (const dep of dependents) {
+      if (await upstreamsDone(tx, dep.id)) {
+        await transitionLocked(tx, dep, "ready", actor);
+      }
+    }
+  }
+
+  return {
+    async open(item: NewWorkItem, opts?: OpenOptions): Promise<WorkItemId> {
       const id = newUlid();
       const at = nowIso();
+      const dependsOn = [...new Set(opts?.dependsOn ?? [])];
       const w = workItemSchema.parse({
         ...item,
         id,
@@ -128,6 +231,23 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
         updatedAt: at,
       });
       await db.withTx(async (tx) => {
+        if (dependsOn.length > 0) {
+          // Lock upstreams so a concurrent complete() cannot race the initial
+          // status decision; any not-yet-done upstream parks the item pending.
+          const upstreams: { id: string; status: string }[] = await txSql(tx)`
+            select id, status from work.work_items
+            where id = any(string_to_array(${dependsOn.join(",")}::text, ','))
+            order by id
+            for update`;
+          if (upstreams.length !== dependsOn.length) {
+            const found = new Set(upstreams.map((u) => u.id));
+            const missing = dependsOn.filter((d) => !found.has(d));
+            throw new WorkItemNotFoundError("open dependsOn", missing.join(", "));
+          }
+          if (upstreams.some((u) => u.status !== "done")) {
+            w.status = "pending";
+          }
+        }
         await txSql(tx)`
           insert into work.work_items
             (id, tenant_id, kind, title, body, status, owner_principal_id, priority,
@@ -140,6 +260,11 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
              ${w.followUp ?? null}::jsonb,
              ${w.processRunId ?? null}, ${w.nodeKey ?? null}, ${w.attempt},
              null, ${w.sourceRefs}::jsonb, ${w.revision}, ${at}, ${at})`;
+        for (const upstreamId of dependsOn) {
+          await txSql(tx)`
+            insert into work.work_edges (id, tenant_id, from_id, to_id, verb, created_at, updated_at)
+            values (${newUlid()}, ${w.tenantId}, ${id}, ${upstreamId}, 'depends_on', ${at}, ${at})`;
+        }
         await spine.append(tx, {
           tenantId: w.tenantId,
           topic: "work.item.opened",
@@ -247,6 +372,98 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
           set status = ${target}, lease = null, revision = revision + 1, updated_at = ${nowIso()}
           where id = ${row.id}`;
         await emitStatusChanged(tx, row, from, target, row.attempt, l.holderPrincipalId);
+        if (target === "done") {
+          await promoteDependents(tx, row.id, { kind: "principal", id: l.holderPrincipalId });
+        }
+      });
+    },
+
+    async resolveApproval(id: WorkItemId, actor: Ref): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "resolveApproval");
+        await transitionLocked(tx, row, "done", actor);
+        await promoteDependents(tx, id, actor);
+      });
+    },
+
+    async get(id: WorkItemId): Promise<WorkItem | undefined> {
+      const rows: WorkItemRow[] = await db.sql`
+        select * from work.work_items where id = ${id}`;
+      const row = rows[0];
+      return row === undefined ? undefined : rowToWorkItem(row);
+    },
+
+    async graphForProcessRun(tenantId: Ulid, processRunId: Ulid): Promise<WorkGraph> {
+      const itemRows: WorkItemRow[] = await db.sql`
+        select * from work.work_items
+        where tenant_id = ${tenantId} and process_run_id = ${processRunId}
+        order by id`;
+      const items = itemRows.map(rowToWorkItem);
+      const ids = new Set(items.map((i) => i.id));
+      interface EdgeRow {
+        id: string;
+        tenant_id: string;
+        from_id: string;
+        to_id: string;
+        verb: string;
+        created_at: Date | string;
+        updated_at: Date | string;
+      }
+      const edgeRows: EdgeRow[] = await db.sql`
+        select e.* from work.work_edges e
+        join work.work_items w on w.id = e.from_id
+        where e.tenant_id = ${tenantId} and w.process_run_id = ${processRunId}
+        order by e.id`;
+      const edges: WorkEdge[] = edgeRows
+        .filter((e) => ids.has(e.to_id))
+        .map((e) =>
+          workEdgeSchema.parse({
+            id: e.id,
+            tenantId: e.tenant_id,
+            fromId: e.from_id,
+            toId: e.to_id,
+            verb: e.verb,
+            createdAt: toIso(e.created_at),
+            updatedAt: toIso(e.updated_at),
+          }),
+        );
+      return { items, edges };
+    },
+
+    async markStale(id: WorkItemId, actor: Ref): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "markStale");
+        await transitionLocked(tx, row, "stale", actor);
+      });
+    },
+
+    async revive(id: WorkItemId, actor: Ref): Promise<WorkItemStatus> {
+      return await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "revive");
+        const target: WorkItemStatus = (await upstreamsDone(tx, id)) ? "ready" : "pending";
+        await transitionLocked(tx, row, target, actor);
+        return target;
+      });
+    },
+
+    async demote(id: WorkItemId, actor: Ref): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "demote");
+        await transitionLocked(tx, row, "pending", actor);
+      });
+    },
+
+    async revokeLease(id: WorkItemId, actor: Ref): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "revokeLease");
+        await transitionLocked(tx, row, "ready", actor);
+      });
+    },
+
+    async cancel(id: WorkItemId, actor: Ref): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "cancel");
+        await transitionLocked(tx, row, "cancelled", actor);
       });
     },
 

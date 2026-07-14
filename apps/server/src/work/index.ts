@@ -1,9 +1,12 @@
 import type {
   PrincipalContext,
+  Ref,
   RunOutcome,
   Ulid,
+  WorkEdge,
   WorkItem,
   WorkItemLease,
+  WorkItemStatus,
   WorkNote,
 } from "@lithis/core";
 import type { Db } from "../db";
@@ -18,10 +21,14 @@ import { createLeaseReclaimSource, createPgWorkQueue } from "./service";
  * ready with attempt preserved (the work.lease-reclaim TickSource, which also
  * flips due wakeAt sleepers pending→ready).
  *
- * Out of scope until later phases: recurring-schedule minting of oneoff
- * occurrence children (clock cron work) and any WorkEdge surface — the
- * work_edges table ships, but pending→ready on depends_on completion is
- * P8-process.
+ * P8-process additions: the WorkEdge surface (open(…, { dependsOn }) starts an
+ * item `pending` until every upstream is done; completing an item to `done`
+ * promotes pending/stale dependents whose upstreams are all done) and the
+ * Invalidator surface (markStale/revive/demote/revokeLease — see the doc
+ * comments; the process Invalidator is the ONLY intended caller of markStale).
+ *
+ * Still out of scope: recurring-schedule minting of oneoff occurrence children
+ * (clock cron work, deferred past P5).
  */
 
 export type WorkItemId = Ulid;
@@ -43,18 +50,50 @@ export interface ClaimFilter {
 
 export type NewWorkNote = Pick<WorkNote, "byRef" | "kind" | "text">;
 
+export interface OpenOptions {
+  /** Upstream items this one depends_on; any not-yet-done upstream opens it `pending`. */
+  dependsOn?: WorkItemId[];
+}
+
+/** A process run's nodes + depends_on/subtask_of edges (for cascade planning). */
+export interface WorkGraph {
+  items: WorkItem[];
+  edges: WorkEdge[];
+}
+
 export interface WorkQueue {
-  open(item: NewWorkItem): Promise<WorkItemId>;
-  /** Read one item (a claimed worker reading what it must do); null when absent. */
-  get(id: WorkItemId): Promise<WorkItem | null>;
+  open(item: NewWorkItem, opts?: OpenOptions): Promise<WorkItemId>;
+  /** Read one item (a claimed worker reading what it must do); undefined when absent. */
+  get(id: WorkItemId): Promise<WorkItem | undefined>;
+  /** Every process_node item of a run plus the edges among them. */
+  graphForProcessRun(tenantId: Ulid, processRunId: Ulid): Promise<WorkGraph>;
   /** SKIP LOCKED claim; null when nothing is ready. */
   claim(p: PrincipalContext, f: ClaimFilter): Promise<Lease | null>;
   heartbeat(l: Lease): Promise<void>;
   release(l: Lease): Promise<void>;
-  /** Drives the state machine: done / awaiting_approval / blocked / failed per outcome. */
+  /**
+   * Drives the state machine: done / awaiting_approval / blocked / failed per
+   * outcome. Reaching `done` promotes pending/stale dependents whose upstreams
+   * are now all done (same transaction).
+   */
   complete(l: Lease, outcome: RunOutcome): Promise<void>;
+  /** A human approved the gated result: awaiting_approval → done (+ dependent promotion). */
+  resolveApproval(id: WorkItemId, actor: Ref): Promise<void>;
   /** Append-only journal; emits work.note.added. */
   addNote(id: WorkItemId, n: NewWorkNote): Promise<void>;
+
+  // ── The Invalidator surface (P8-process). The Invalidator (processes module)
+  //    is the ONLY writer of `stale` — nothing else should call markStale. ──
+  /** done|awaiting_approval → stale. */
+  markStale(id: WorkItemId, actor: Ref): Promise<void>;
+  /** stale → ready when every depends_on upstream is done, else stale → pending. */
+  revive(id: WorkItemId, actor: Ref): Promise<WorkItemStatus>;
+  /** ready → pending (an upstream is no longer done). */
+  demote(id: WorkItemId, actor: Ref): Promise<void>;
+  /** claimed|running → ready with the lease cleared; the holder's next lease op throws LeaseLostError. */
+  revokeLease(id: WorkItemId, actor: Ref): Promise<void>;
+  /** Any live status → cancelled (lease cleared). */
+  cancel(id: WorkItemId, actor: Ref): Promise<void>;
 }
 
 export interface WorkQueueOptions {

@@ -35,6 +35,8 @@ const envSchema = z.object({
   LITHIS_DISTILL_MODEL: z.string().min(1).optional(),
   /** Model for resident-agent executor runs (default claude-sonnet-5). */
   LITHIS_AGENT_MODEL: z.string().min(1).optional(),
+  /** Rerun cascades wider than this gate as HumanRequest{cascade_plan} (processes module, default 3). */
+  LITHIS_CASCADE_AUTO_WIDTH: z.coerce.number().int().positive().optional(),
   /** Slack delivery + inbound Socket Mode (delivery module + slack connector). */
   SLACK_BOT_TOKEN: z.string().min(1).optional(),
   SLACK_APP_TOKEN: z.string().min(1).optional(),
@@ -59,6 +61,7 @@ export interface ServerConfig {
   blobBucket?: string;
   distillModel?: string;
   agentModel?: string;
+  cascadeAutoWidth?: number;
   slackBotToken?: string;
   slackAppToken?: string;
   googleClientId?: string;
@@ -88,6 +91,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       ? { distillModel: parsed.LITHIS_DISTILL_MODEL }
       : {}),
     ...(parsed.LITHIS_AGENT_MODEL !== undefined ? { agentModel: parsed.LITHIS_AGENT_MODEL } : {}),
+    ...(parsed.LITHIS_CASCADE_AUTO_WIDTH !== undefined
+      ? { cascadeAutoWidth: parsed.LITHIS_CASCADE_AUTO_WIDTH }
+      : {}),
     ...(parsed.SLACK_BOT_TOKEN !== undefined ? { slackBotToken: parsed.SLACK_BOT_TOKEN } : {}),
     ...(parsed.SLACK_APP_TOKEN !== undefined ? { slackAppToken: parsed.SLACK_APP_TOKEN } : {}),
     ...(parsed.GOOGLE_CLIENT_ID !== undefined ? { googleClientId: parsed.GOOGLE_CLIENT_ID } : {}),
