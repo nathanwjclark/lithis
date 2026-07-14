@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "@lithis/core": "workspace:*",
     "@lithis/stubkit": "workspace:*",
     "hono": "^4.12.30",
