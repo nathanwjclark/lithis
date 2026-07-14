@@ -74,6 +74,12 @@ export async function truncateAll(db: Db): Promise<void> {
 work.work_items,
       work.work_edges,
       work.work_notes,
-      humangate.human_requests
+      humangate.human_requests,
+      context.blobs,
+      context.docs,
+      context.entities,
+      context.links,
+      context.chunks,
+      context.relationship_scores
     cascade`;
 }

@@ -23,6 +23,14 @@ const envSchema = z.object({
   //    never have to edit this file ──────────────────────────────────────────
   /** Agent execution (agents module / distill in context). */
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** Context embeddings (OpenAI text-embedding-3-small); unset → FTS-only search. */
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  /** Local blob-storage root when OBJECT_STORE_URL is unset (default var/blobs). */
+  LITHIS_BLOB_DIR: z.string().min(1).optional(),
+  /** Bucket for the Bun.s3 blob driver when OBJECT_STORE_URL is set. */
+  LITHIS_BLOB_BUCKET: z.string().min(1).optional(),
+  /** Model for the ingest-time distill pass (default claude-sonnet-5). */
+  LITHIS_DISTILL_MODEL: z.string().min(1).optional(),
   /** Slack delivery + inbound Socket Mode (delivery module + slack connector). */
   SLACK_BOT_TOKEN: z.string().min(1).optional(),
   SLACK_APP_TOKEN: z.string().min(1).optional(),
@@ -41,6 +49,10 @@ export interface ServerConfig {
   databaseUrl?: string;
   objectStoreUrl?: string;
   anthropicApiKey?: string;
+  openaiApiKey?: string;
+  blobDir?: string;
+  blobBucket?: string;
+  distillModel?: string;
   slackBotToken?: string;
   slackAppToken?: string;
   googleClientId?: string;
@@ -62,6 +74,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     ...(parsed.DATABASE_URL !== undefined ? { databaseUrl: parsed.DATABASE_URL } : {}),
     ...(parsed.OBJECT_STORE_URL !== undefined ? { objectStoreUrl: parsed.OBJECT_STORE_URL } : {}),
     ...(parsed.ANTHROPIC_API_KEY !== undefined ? { anthropicApiKey: parsed.ANTHROPIC_API_KEY } : {}),
+    ...(parsed.OPENAI_API_KEY !== undefined ? { openaiApiKey: parsed.OPENAI_API_KEY } : {}),
+    ...(parsed.LITHIS_BLOB_DIR !== undefined ? { blobDir: parsed.LITHIS_BLOB_DIR } : {}),
+    ...(parsed.LITHIS_BLOB_BUCKET !== undefined ? { blobBucket: parsed.LITHIS_BLOB_BUCKET } : {}),
+    ...(parsed.LITHIS_DISTILL_MODEL !== undefined
+      ? { distillModel: parsed.LITHIS_DISTILL_MODEL }
+      : {}),
     ...(parsed.SLACK_BOT_TOKEN !== undefined ? { slackBotToken: parsed.SLACK_BOT_TOKEN } : {}),
     ...(parsed.SLACK_APP_TOKEN !== undefined ? { slackAppToken: parsed.SLACK_APP_TOKEN } : {}),
     ...(parsed.GOOGLE_CLIENT_ID !== undefined ? { googleClientId: parsed.GOOGLE_CLIENT_ID } : {}),

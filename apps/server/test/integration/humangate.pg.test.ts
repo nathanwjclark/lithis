@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { IllegalTransitionError, newUlid } from "@lithis/core";
 import type { HumanResolution, PrincipalContext } from "@lithis/core";
 import { buildApp } from "../../src/api";
-import { createContextStore } from "../../src/context";
+import { createUnconfiguredContextStore } from "../../src/context";
 import { createHumanGate, slaTickSource } from "../../src/humangate";
 import type { NewHumanRequest } from "../../src/humangate";
 import { createEventSpine } from "../../src/spine";
@@ -296,7 +296,7 @@ describePg("humangate HTTP routes (integration)", () => {
       role: "all",
       humanGate: createHumanGate(db, spine),
       workQueue: createWorkQueue(db, spine),
-      contextStore: createContextStore(),
+      contextStore: createUnconfiguredContextStore(),
     });
   }
 
@@ -439,7 +439,7 @@ describePg("humangate HTTP routes (integration)", () => {
 
 describe("humangate HTTP routes (db-less)", () => {
   // Complements apps/server/test/api.test.ts: identity errors still win over 503.
-  const dblessApp = buildApp({ role: "all", contextStore: createContextStore() });
+  const dblessApp = buildApp({ role: "all", contextStore: createUnconfiguredContextStore() });
 
   test("resolve route answers 503 after identity passes, 400 without identity", async () => {
     const noIdentity = await dblessApp.request(`/api/humangate/${newUlid()}/resolve`, {

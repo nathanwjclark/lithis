@@ -5,7 +5,7 @@ import { applyMigrations, collectMigrations, createDb } from "./db";
 import { createAgentExecutor, createAgentHost, createToolBroker } from "./agents";
 import { createArtifactEngine } from "./artifacts";
 import { createConnectionRegistry } from "./connections";
-import { createContextStore } from "./context";
+import { contextDepsFromConfig, createContextStore, createUnconfiguredContextStore } from "./context";
 import { createCustody } from "./custody";
 import { createDelivery } from "./delivery";
 import { createHumanGate, slaTickSource } from "./humangate";
@@ -53,7 +53,10 @@ export async function boot(): Promise<void> {
       : {}),
     policyEngine: createPolicyEngine(),
     custody: createCustody(),
-    contextStore: createContextStore(),
+contextStore:
+      db !== undefined && spine !== undefined
+        ? createContextStore(db, spine, contextDepsFromConfig(config))
+        : createUnconfiguredContextStore(),
     ...(db !== undefined && spine !== undefined ? { workQueue: createWorkQueue(db, spine) } : {}),
     processEngine: createProcessEngine(),
     ...(db !== undefined && spine !== undefined ? { humanGate: createHumanGate(db, spine) } : {}),
