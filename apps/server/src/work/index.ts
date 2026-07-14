@@ -45,6 +45,8 @@ export type NewWorkNote = Pick<WorkNote, "byRef" | "kind" | "text">;
 
 export interface WorkQueue {
   open(item: NewWorkItem): Promise<WorkItemId>;
+  /** Read one item (a claimed worker reading what it must do); null when absent. */
+  get(id: WorkItemId): Promise<WorkItem | null>;
   /** SKIP LOCKED claim; null when nothing is ready. */
   claim(p: PrincipalContext, f: ClaimFilter): Promise<Lease | null>;
   heartbeat(l: Lease): Promise<void>;

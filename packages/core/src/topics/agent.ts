@@ -11,3 +11,8 @@ export const T_AGENT_SLEPT = defineEventType({
   description: "A resident agent closed its session and scheduled its own next wake.",
   payload: z.object({ nextWakeAt: z.string().optional() }),
 });
+export const T_AGENT_TOOL_CALLED = defineEventType({
+  topic: "agent.tool_called",
+  description: "The executor dispatched one tool call inside a run (the ToolBroker audit trail).",
+  payload: z.object({ tool: z.string().min(1), isError: z.boolean() }),
+});
