@@ -70,6 +70,9 @@ export async function truncateAll(db: Db): Promise<void> {
       iam.tenants,
       iam.principals,
       iam.agent_charters,
-      iam.action_intents
+      iam.action_intents,
+      work.work_items,
+      work.work_edges,
+      work.work_notes
     cascade`;
 }

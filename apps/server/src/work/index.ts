@@ -6,14 +6,22 @@ import type {
   WorkItemLease,
   WorkNote,
 } from "@lithis/core";
-import { stubService } from "@lithis/stubkit";
+import type { Db } from "../db";
+import type { EventSpine, TickSource } from "../spine";
+import { createLeaseReclaimSource, createPgWorkQueue } from "./service";
 
 /**
  * work — ONE work graph (pillars 3+4 merged): the global agent task list and
  * process nodes are the same table, state machine (WORK_ITEM_TRANSITIONS in
  * @lithis/core), and claim protocol. The WorkItem table IS the job queue:
  * FOR UPDATE SKIP LOCKED + lease/heartbeat; expired leases return items to
- * ready with attempt preserved.
+ * ready with attempt preserved (the work.lease-reclaim TickSource, which also
+ * flips due wakeAt sleepers pending→ready).
+ *
+ * Out of scope until later phases: recurring-schedule minting of oneoff
+ * occurrence children (clock cron work) and any WorkEdge surface — the
+ * work_edges table ships, but pending→ready on depends_on completion is
+ * P8-process.
  */
 
 export type WorkItemId = Ulid;
@@ -47,12 +55,18 @@ export interface WorkQueue {
   addNote(id: WorkItemId, n: NewWorkNote): Promise<void>;
 }
 
-const workQueue = stubService<WorkQueue>(
-  "server.work.queue",
-  ["open", "claim", "heartbeat", "release", "complete", "addNote"],
-  "LITHIS-STUB: SKIP LOCKED work queue (leases, heartbeats, state machine, notes) not implemented",
-);
-
-export function createWorkQueue(): WorkQueue {
-  return workQueue;
+export interface WorkQueueOptions {
+  /** How long a claim lives without a heartbeat (default 5 minutes). */
+  leaseTtlMs?: number;
 }
+
+export function createWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOptions): WorkQueue {
+  return createPgWorkQueue(db, spine, opts);
+}
+
+/** The clock TickSource that reclaims expired leases and wakes due sleepers. */
+export function createLeaseReclaimTickSource(db: Db, spine: EventSpine): TickSource {
+  return createLeaseReclaimSource(db, spine);
+}
+
+export { LeaseLostError, OUTCOME_TO_STATUS, assertHeldLease, initialStatus } from "./state";

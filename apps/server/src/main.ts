@@ -15,7 +15,7 @@ import { createWatcherHost } from "./sentinel";
 import { createSkillRegistry } from "./skills";
 import { createSorRuntime } from "./sor";
 import { createClock, createEventSpine } from "./spine";
-import { createWorkQueue } from "./work";
+import { createLeaseReclaimTickSource, createWorkQueue } from "./work";
 
 /**
  * Boot — parse config, connect Postgres when configured (running migrations
@@ -54,7 +54,7 @@ export async function boot(): Promise<void> {
     policyEngine: createPolicyEngine(),
     custody: createCustody(),
     contextStore: createContextStore(),
-    workQueue: createWorkQueue(),
+    ...(db !== undefined && spine !== undefined ? { workQueue: createWorkQueue(db, spine) } : {}),
     processEngine: createProcessEngine(),
     humanGate: createHumanGate(),
     agentHost: createAgentHost(),
@@ -67,6 +67,10 @@ export async function boot(): Promise<void> {
     sorRuntime: createSorRuntime(),
     watcherHost: createWatcherHost(),
   };
+
+  if (db !== undefined && spine !== undefined && clock !== undefined) {
+    clock.registerSource(createLeaseReclaimTickSource(db, spine));
+  }
 
   console.log(`lithis server — role=${config.role} port=${config.port}`);
   console.log(StubRegistry.renderCensus());
@@ -82,7 +86,7 @@ export async function boot(): Promise<void> {
     const app = buildApp({
       role: config.role,
       humanGate: services.humanGate,
-      workQueue: services.workQueue,
+      ...(services.workQueue !== undefined ? { workQueue: services.workQueue } : {}),
       contextStore: services.contextStore,
     });
     server = Bun.serve({ port: config.port, fetch: app.fetch });
