@@ -3,12 +3,13 @@ import { newUlid } from "@lithis/core";
 import { buildApp } from "../src/api";
 import { createContextStore } from "../src/context";
 import { createHumanGate } from "../src/humangate";
-import { createWorkQueue } from "../src/work";
 
+// No workQueue: this suite exercises the DB-less surface (work is real as of
+// P5 and needs Postgres — its route behavior over a live queue is covered by
+// test/integration/work.pg.test.ts).
 const app = buildApp({
   role: "all",
   humanGate: createHumanGate(),
-  workQueue: createWorkQueue(),
   contextStore: createContextStore(),
   startedAtMs: Date.now() - 5_000,
 });
@@ -58,10 +59,9 @@ describe("placeholder domain routes answer 501 with the stub id", () => {
     expect(body.reason).toStartWith("LITHIS-STUB:");
   });
 
-  test("GET /api/work → 501 with server.work.queue.claim", async () => {
-    const res = await app.request("/api/work", { headers: identity });
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { stubId: string }).stubId).toBe("server.work.queue.claim");
+  test("POST /api/work/claim → 503 when the server has no database", async () => {
+    const res = await app.request("/api/work/claim", { method: "POST", headers: identity });
+    expect(res.status).toBe(503);
   });
 
   test("GET /api/context/search → 501 with server.context.store.search", async () => {
@@ -78,7 +78,8 @@ describe("request validation stays a 400, not a stub 501", () => {
   });
 
   test("invalid principal ULID", async () => {
-    const res = await app.request("/api/work", {
+    const res = await app.request("/api/work/claim", {
+      method: "POST",
       headers: { "x-lithis-tenant": newUlid(), "x-lithis-principal": "not-a-ulid" },
     });
     expect(res.status).toBe(400);

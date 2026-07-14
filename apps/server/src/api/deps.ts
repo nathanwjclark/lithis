@@ -11,7 +11,8 @@ import type { ServerRole } from "../config";
 export interface ApiDeps {
   role: ServerRole;
   humanGate: HumanGate;
-  workQueue: WorkQueue;
+  /** Absent when the server runs without a database — work routes answer 503. */
+  workQueue?: WorkQueue;
   contextStore: ContextStore;
   /** Injectable for tests; defaults to construction time. */
   startedAtMs?: number;
