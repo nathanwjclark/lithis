@@ -1,5 +1,7 @@
-import type { Event, RefKind } from "@lithis/core";
-import { stubService } from "@lithis/stubkit";
+import type { Event, RefKind, Ulid } from "@lithis/core";
+import type { Db, DbTx } from "../db";
+import { createClockRuntime } from "./clock";
+import { createPgEventSpine } from "./events";
 
 /**
  * spine — the append-only event log: simultaneously audit trail, trigger bus,
@@ -11,24 +13,22 @@ import { stubService } from "@lithis/stubkit";
  * HumanRequest SLAs.
  */
 
-/** Opaque handle to the transaction a mutation is writing in (outbox contract). */
-export interface DbTx {
-  readonly __brand: "DbTx";
-}
+export type { DbTx } from "../db";
 
 /** A new event before the outbox assigns id/seq/at (and optional hash chain). */
 export type NewEvent = Omit<Event, "id" | "seq" | "at" | "prevHash" | "hash">;
 
 /** What a consumer wants to see. Empty selector = everything. */
 export interface EventSelector {
-  /** Dot-namespaced topic globs, e.g. "context.doc.*". */
+  /** Dot-namespaced topic globs, e.g. "context.doc.*" (see ./selector.ts for semantics). */
   topics?: string[];
   subjectKinds?: RefKind[];
 }
 
-/** Durable consumer checkpoint. */
+/** Durable consumer checkpoint — cursors are per (consumer, tenant). */
 export interface Cursor {
   consumerId: string;
+  tenantId: Ulid;
   afterSeq: bigint;
 }
 
@@ -41,10 +41,21 @@ export interface Subscription {
 export interface EventSpine {
   /** Transactional outbox append — the event commits with the mutation or not at all. */
   append(tx: DbTx, e: NewEvent): Promise<Event>;
-  /** Durable at-least-once subscription, checkpointed per consumerId. */
+  /** Durable at-least-once subscription, checkpointed per (consumerId, tenant). */
   subscribe(consumerId: string, sel: EventSelector, h: (e: Event) => Promise<void>): Subscription;
-  /** Replay/catch-up read from a cursor. */
+  /** Replay/catch-up read from a cursor. Never moves stored cursors. */
   readSince(cursor: Cursor, sel?: EventSelector, limit?: number): Promise<Event[]>;
+}
+
+/**
+ * The runtime face of the spine: the polling dispatcher loop lives behind
+ * start/stop so the GCP SpineDriver adapter can later replace the transport
+ * without touching append.
+ */
+export interface EventSpineRuntime extends EventSpine {
+  startDispatcher(opts?: { intervalMs?: number }): void;
+  /** Stops the loop and drains the in-flight delivery cycle. */
+  stopDispatcher(): Promise<void>;
 }
 
 /**
@@ -56,22 +67,22 @@ export interface Clock {
   tick(now: Date): Promise<void>;
 }
 
-const eventSpine = stubService<EventSpine>(
-  "server.spine.events",
-  ["append", "subscribe", "readSince"],
-  "LITHIS-STUB: transactional outbox + dispatcher + cursor-checkpointed subscriptions not implemented",
-);
-
-const clock = stubService<Clock>(
-  "server.spine.clock",
-  ["tick"],
-  "LITHIS-STUB: the clock loop (schedules, wakes, grace windows, SLA ticks) not implemented",
-);
-
-export function createEventSpine(): EventSpine {
-  return eventSpine;
+/** A domain's periodic work, registered with the clock (work/humangate/connections in later phases). */
+export interface TickSource {
+  id: string;
+  tick(now: Date): Promise<void>;
 }
 
-export function createClock(): Clock {
-  return clock;
+export interface ClockRuntime extends Clock {
+  registerSource(s: TickSource): void;
+  start(opts?: { intervalMs?: number }): void;
+  stop(): void;
+}
+
+export function createEventSpine(db: Db): EventSpineRuntime {
+  return createPgEventSpine(db);
+}
+
+export function createClock(): ClockRuntime {
+  return createClockRuntime();
 }

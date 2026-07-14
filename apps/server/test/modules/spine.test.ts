@@ -1,22 +1,11 @@
+// spine is REAL as of phase 1 — behavioral coverage lives in
+// test/spine.selector.test.ts, test/spine.clock.test.ts, and
+// test/integration/spine.pg.test.ts. This file remains only to document that
+// the module intentionally has no stub cases left.
 import { expect, test } from "bun:test";
-import { createClock, createEventSpine } from "../../src/spine";
-import { describeStubService } from "../helpers/stub-services";
+import { StubRegistry } from "@lithis/stubkit";
 
-describeStubService({
-  name: "spine EventSpine",
-  service: createEventSpine(),
-  idPrefix: "server.spine.events",
-  methods: ["append", "subscribe", "readSince"],
-});
-
-describeStubService({
-  name: "spine Clock",
-  service: createClock(),
-  idPrefix: "server.spine.clock",
-  methods: ["tick"],
-});
-
-test("spine factories return singletons (stub ids register exactly once)", () => {
-  expect(createEventSpine()).toBe(createEventSpine());
-  expect(createClock()).toBe(createClock());
+test("spine registers no stubs — the module is implemented", () => {
+  const spineStubs = StubRegistry.census().records.filter((r) => r.id.startsWith("server.spine."));
+  expect(spineStubs).toEqual([]);
 });

@@ -9,6 +9,9 @@ import type {
   Ulid,
 } from "@lithis/core";
 import { stubService } from "@lithis/stubkit";
+import type { Db } from "../db";
+import type { EventSpine } from "../spine";
+import { createPgIdentityService } from "./service";
 
 /**
  * iam — tenants, principals, agent charters. Deliberately minimal: the
@@ -46,16 +49,12 @@ const policyEngine = stubService<PolicyEngine>(
   "LITHIS-STUB: policy engine deferred (Grant/Mandate wiring lives in TODOS.md); nothing depends on it yet",
 );
 
-const identityService = stubService<IdentityService>(
-  "server.iam.identity",
-  ["createTenant", "createPrincipal", "getCharter"],
-  "LITHIS-STUB: tenant/principal/charter persistence not implemented",
-);
-
 export function createPolicyEngine(): PolicyEngine {
   return policyEngine;
 }
 
-export function createIdentityService(): IdentityService {
-  return identityService;
+export function createIdentityService(db: Db, spine: EventSpine): IdentityService {
+  return createPgIdentityService(db, spine);
 }
+
+export { ensureDevSeed } from "./seed";

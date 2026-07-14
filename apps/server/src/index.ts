@@ -6,7 +6,7 @@
  */
 
 export * from "./config";
-export * from "./db/migrate";
+export * from "./db";
 export * from "./spine";
 export * from "./iam";
 export * from "./custody";

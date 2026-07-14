@@ -8,6 +8,20 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: lithis
+          POSTGRES_PASSWORD: lithis-local
+          POSTGRES_DB: lithis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lithis"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -23,6 +37,8 @@ jobs:
 
       - name: Test
         run: bun test
+        env:
+          LITHIS_TEST_DATABASE_URL: postgres://lithis:lithis-local@localhost:5432/lithis_test
 
       - name: Stub census (honesty gate)
         run: bun run stubscan --json stub-census.json

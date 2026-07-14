@@ -12,8 +12,8 @@ Statuses: `todo` · `in progress` · `in review (PR #)` · `done (PR #)`
 
 | Phase | Status | Scope (stub ids going real) | Hard deps | Credentials | Acceptance |
 |---|---|---|---|---|---|
-| **P0-seams** | in progress | Conflict-seam refactor: per-module API route files, per-module stub tests, per-domain topic files, pre-declared env vars, this file | — | — | `bun run check` green; stub census byte-identical |
-| **P1-spine** | todo | `server.db.migrate.apply`, `server.spine.events.*`, `server.spine.clock.tick`, `server.iam.identity.*`, `cli.init` — Bun SQL db module, transactional outbox, polling dispatcher + durable cursors, clock w/ TickSource registry, identity CRUD + dev seed, Postgres integration-test harness | P0 | — | events flow compose-locally; dispatcher resumes from checkpoint after restart |
+| **P0-seams** | done (PR #2) | Conflict-seam refactor: per-module API route files, per-module stub tests, per-domain topic files, pre-declared env vars, this file | — | — | `bun run check` green; stub census byte-identical |
+| **P1-spine** | in review | `server.db.migrate.apply`, `server.spine.events.*`, `server.spine.clock.tick`, `server.iam.identity.*`, `cli.init` — Bun SQL db module, transactional outbox, polling dispatcher + durable cursors, clock w/ TickSource registry, identity CRUD + dev seed, Postgres integration-test harness | P0 | — | events flow compose-locally; dispatcher resumes from checkpoint after restart |
 | **C-slack** | todo | `connector.slack.*` — fetch-based Slack Web API (no SDK dep) · *port: crm Slack client* | — | Slack bot token (live smoke only) | fixture-replay sync through a fake IngestSink |
 | **C-google** | todo | `connector.google-workspace.*` — Gmail/Calendar REST (no googleapis dep) · *port: crm Google collectors* | — | Google OAuth (live smoke only) | fixture-replay → typed doc inputs; idempotent re-sync |
 | **C-ms365** | todo | `connector.microsoft-365.*` via Graph API | — | Entra app | same shape as C-google; wave-4 filler |

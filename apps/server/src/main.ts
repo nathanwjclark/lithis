@@ -1,6 +1,7 @@
 import { StubRegistry } from "@lithis/stubkit";
 import { buildApp } from "./api";
 import { loadConfig } from "./config";
+import { applyMigrations, collectMigrations, createDb } from "./db";
 import { createAgentExecutor, createAgentHost, createToolBroker } from "./agents";
 import { createArtifactEngine } from "./artifacts";
 import { createConnectionRegistry } from "./connections";
@@ -17,19 +18,40 @@ import { createClock, createEventSpine } from "./spine";
 import { createWorkQueue } from "./work";
 
 /**
- * Boot — parse config, instantiate every module (registering their stubs),
- * print the stub census so nobody mistakes the skeleton for a product, and
- * serve the API when the role includes it. No DB connection in the skeleton.
+ * Boot — parse config, connect Postgres when configured (running migrations
+ * and constructing the REAL spine + identity over it), instantiate every
+ * remaining module (registering their stubs), print the stub census so nobody
+ * mistakes partial for complete, and serve the API when the role includes it.
+ * The orchestrator role runs the dispatcher + clock loops.
+ *
+ * Convention for later phases: your newly-real service takes the shared deps
+ * (db, spine, clock, ...) in its create function and occupies ONE line in the
+ * services literal below — keep main.ts diffs one-line-per-phase.
  */
-export function boot(): void {
+export async function boot(): Promise<void> {
   const config = loadConfig();
+
+  const db = config.databaseUrl !== undefined ? createDb(config.databaseUrl) : undefined;
+  if (db !== undefined) {
+    const summary = await applyMigrations(config.databaseUrl!, collectMigrations());
+    console.log(
+      `migrations: ${summary.applied.length} applied, ${summary.skipped} already up to date`,
+    );
+  } else {
+    console.log("DATABASE_URL not set — spine/iam run disabled; DB-less skeleton mode");
+  }
+
+  const spine = db !== undefined ? createEventSpine(db) : undefined;
+  const clock = db !== undefined ? createClock() : undefined;
 
   // Instantiate all module services so the census below is complete.
   const services = {
-    eventSpine: createEventSpine(),
-    clock: createClock(),
+    ...(spine !== undefined ? { eventSpine: spine } : {}),
+    ...(clock !== undefined ? { clock } : {}),
+    ...(db !== undefined && spine !== undefined
+      ? { identity: createIdentityService(db, spine) }
+      : {}),
     policyEngine: createPolicyEngine(),
-    identity: createIdentityService(),
     custody: createCustody(),
     contextStore: createContextStore(),
     workQueue: createWorkQueue(),
@@ -49,6 +71,13 @@ export function boot(): void {
   console.log(`lithis server — role=${config.role} port=${config.port}`);
   console.log(StubRegistry.renderCensus());
 
+  if ((config.role === "orchestrator" || config.role === "all") && spine !== undefined) {
+    spine.startDispatcher();
+    clock?.start();
+    console.log("orchestrator loops running: spine dispatcher (300ms poll), clock (30s tick)");
+  }
+
+  let server: ReturnType<typeof Bun.serve> | undefined;
   if (config.role === "api" || config.role === "all") {
     const app = buildApp({
       role: config.role,
@@ -56,13 +85,24 @@ export function boot(): void {
       workQueue: services.workQueue,
       contextStore: services.contextStore,
     });
-    Bun.serve({ port: config.port, fetch: app.fetch });
+    server = Bun.serve({ port: config.port, fetch: app.fetch });
     console.log(`api listening on http://localhost:${config.port} — GET /health, GET /stubs`);
   } else {
-    console.log(`role '${config.role}' serves no HTTP; orchestrator/worker loops are stubbed (see census above)`);
+    console.log(`role '${config.role}' serves no HTTP`);
   }
+
+  const shutdown = async (): Promise<void> => {
+    console.log("shutting down…");
+    clock?.stop();
+    await spine?.stopDispatcher();
+    server?.stop();
+    await db?.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void shutdown());
+  process.on("SIGTERM", () => void shutdown());
 }
 
 if (import.meta.main) {
-  boot();
+  void boot();
 }

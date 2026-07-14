@@ -19,8 +19,15 @@ ONE append-only event log serves all five roles. Every mutation writes its
 transactional outbox); a dispatcher (orchestrator role) delivers to durable,
 cursor-checkpointed, at-least-once subscriptions. Topics are dot-namespaced
 and registered via `defineEventType()` in `@lithis/core` — emitting an
-unregistered topic is a bug. Locally delivery rides LISTEN/NOTIFY; on GCP a
-`SpineDriver` adapter maps to Pub/Sub. Envelope fields `prevHash`/`hash`
+unregistered topic is a bug. Locally the dispatcher polls the outbox (300ms,
+plus an in-process wake right after each append — Bun's SQL client has no
+LISTEN/NOTIFY yet; the durable cursors make polling the correctness ground
+truth either way, so LISTEN is a deferred latency optimization behind the
+dispatcher seam). On GCP a `SpineDriver` adapter maps to Pub/Sub. Per-tenant
+`seq` is assigned from a counter row (`spine.tenant_seq`) upserted inside the
+appending transaction — the row lock makes seq gapless AND commit-ordered per
+tenant, so cursor scans can never skip a late-committing event. Envelope
+fields `prevHash`/`hash`
 reserve a tamper-evident chain (chaining itself deferred, TODOS.md).
 
 External brokers (Kafka, Pub/Sub) as the PRIMARY log were rejected: the
