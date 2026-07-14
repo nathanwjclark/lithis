@@ -71,7 +71,7 @@ export async function truncateAll(db: Db): Promise<void> {
       iam.principals,
       iam.agent_charters,
       iam.action_intents,
-work.work_items,
+      work.work_items,
       work.work_edges,
       work.work_notes,
       humangate.human_requests,
@@ -80,6 +80,9 @@ work.work_items,
       context.entities,
       context.links,
       context.chunks,
-      context.relationship_scores
+      context.relationship_scores,
+      connections.connections,
+      connections.feed_expectations,
+      connections.credentials
     cascade`;
 }

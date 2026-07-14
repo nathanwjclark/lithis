@@ -4,9 +4,16 @@ import { loadConfig } from "./config";
 import { applyMigrations, collectMigrations, createDb } from "./db";
 import { createAgentExecutor, createAgentHost, createToolBroker } from "./agents";
 import { createArtifactEngine } from "./artifacts";
-import { createConnectionRegistry } from "./connections";
+import {
+  createConnectionRegistry,
+  createConnectorRuntime,
+  createCredentialDirectory,
+  createFeedExpectationTickSource,
+  createPendingIngestSink,
+  createSyncTickSource,
+} from "./connections";
 import { contextDepsFromConfig, createContextStore, createUnconfiguredContextStore } from "./context";
-import { createCustody } from "./custody";
+import { createCustody, createEnvFileBackend } from "./custody";
 import { createDelivery } from "./delivery";
 import { createHumanGate, slaTickSource } from "./humangate";
 import { createIdentityService, createPolicyEngine } from "./iam";
@@ -44,6 +51,32 @@ export async function boot(): Promise<void> {
   const spine = db !== undefined ? createEventSpine(db) : undefined;
   const clock = db !== undefined ? createClock() : undefined;
 
+  // P3-connect wiring: credential directory → custody broker → connector
+  // runtime → connection registry. DB-less skeleton mode skips it all (the
+  // remaining custody mountSession stub still registers via module load).
+  const connectivity = (() => {
+    if (db === undefined || spine === undefined) return undefined;
+    const credentials = createCredentialDirectory(db, spine);
+    const custody = createCustody({
+      db,
+      spine,
+      credentials,
+      backend: createEnvFileBackend(config.secretsFile),
+    });
+    const connectorRuntime = createConnectorRuntime({
+      getAuth: async (connection) => {
+        const auth = await custody.issueFor(connection.credentialRef, connection.tenantId, {
+          kind: "connection",
+          id: connection.id,
+        });
+        return { kind: auth.kind, token: auth.brokerToken, expiresAt: auth.expiresAt };
+      },
+      redeem: async (brokerToken) => (await custody.redeem(brokerToken)).secret,
+    });
+    const connectionRegistry = createConnectionRegistry(db, spine, { probes: connectorRuntime });
+    return { custody, connectorRuntime, connectionRegistry };
+  })();
+
   // Instantiate all module services so the census below is complete.
   const services = {
     ...(spine !== undefined ? { eventSpine: spine } : {}),
@@ -52,8 +85,10 @@ export async function boot(): Promise<void> {
       ? { identity: createIdentityService(db, spine) }
       : {}),
     policyEngine: createPolicyEngine(),
-    custody: createCustody(),
-contextStore:
+    ...(connectivity !== undefined
+      ? { custody: connectivity.custody, connectionRegistry: connectivity.connectionRegistry }
+      : {}),
+    contextStore:
       db !== undefined && spine !== undefined
         ? createContextStore(db, spine, contextDepsFromConfig(config))
         : createUnconfiguredContextStore(),
@@ -63,7 +98,6 @@ contextStore:
     agentHost: createAgentHost(),
     agentExecutor: createAgentExecutor(),
     toolBroker: createToolBroker(),
-    connectionRegistry: createConnectionRegistry(),
     delivery: createDelivery(),
     skillRegistry: createSkillRegistry(),
     artifactEngine: createArtifactEngine(),
@@ -80,6 +114,18 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
 
   console.log(`lithis server — role=${config.role} port=${config.port}`);
   console.log(StubRegistry.renderCensus());
+
+  if (clock !== undefined && db !== undefined && spine !== undefined && connectivity !== undefined) {
+    clock.registerSource(createFeedExpectationTickSource(db, spine));
+    clock.registerSource(
+      createSyncTickSource({
+        db,
+        spine,
+        runtime: connectivity.connectorRuntime,
+        sink: createPendingIngestSink(),
+      }),
+    );
+  }
 
   if ((config.role === "orchestrator" || config.role === "all") && spine !== undefined) {
     spine.startDispatcher();

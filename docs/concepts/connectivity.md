@@ -36,7 +36,8 @@ From `packages/core/src/connectivity.ts`:
 ```
 Connection { connectorSlug, displayName, credentialRef, scopes[],
              status: 'healthy'|'degraded'|'expired'|'disabled',
-             health: { lastOkAt?, lastError? }, syncState: { cursorsByFeed } }
+             health: { lastOkAt?, lastError? },
+             syncState: { cursorsByFeed, lastSyncAt?, lastError? } }
 FeedExpectation { connectionId, key /* "carrier-sftp:loss-runs" */,
                   expectCadence: Cron, graceMinutes, lastSeenAt?, missedCount,
                   onMiss: 'flag'|'task'|'both' }
@@ -47,6 +48,17 @@ nobody notices" defense: the clock checks grace windows and emits
 `feed.expectation.missed`, which becomes a flag and/or a WorkItem per
 `onMiss`. Health transitions emit `connection.health.changed`; syncs emit
 `connector.sync.completed`.
+
+> **Implemented in P3-connect**: the Postgres connection registry (register /
+> list / health / recordFeedSeen), the `ConnectorRuntime` seam connectors
+> register into (plain `Connector` or a factory receiving the
+> `ConnectorAuthProvider`), and two clock TickSources —
+> `connections.feed-expectations` (misses announce once per missed cron
+> occurrence, recover via `recordFeedSeen`, recovery emits
+> `feed.expectation.recovered`) and `connections.sync` (due connections pull
+> every manifest feed from its stored cursor; failures land honestly in
+> `syncState.lastError` + health). Synced content still flows into a stubbed
+> ingest sink until P4-context lands.
 
 ## Custody
 
@@ -60,6 +72,15 @@ mountSession(ref, host): Promise<SessionMount>;  // sealed browser profiles
 ```
 
 Connectors receive `BrokeredAuth`, not keys; every issuance is an event.
+
+> **Implemented in P3-connect**: `getBrokered` (plus server-internal
+> `issueFor`/`redeem`) is real over the env-file backend — credential rows
+> point at material via `custodyBackendRef: "env-file:<KEY>"`, resolved from
+> the dotenv-style file at `LITHIS_SECRETS_FILE`. The handle carries a
+> random 15-minute `brokerToken` redeemed in-process by the connector
+> runtime; the secret never rides the handle, an event, or the API. Issuances
+> emit `custody.credential.brokered`. `mountSession` remains stubbed until
+> the browserhost lands (P12).
 
 ## Browserhost
 

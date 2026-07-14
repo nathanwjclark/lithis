@@ -21,6 +21,8 @@ const envSchema = z.object({
   // ── pre-declared for later build-out phases (all optional, unused until the
   //    owning module goes real) — declared here so parallel phase branches
   //    never have to edit this file ──────────────────────────────────────────
+  /** Local custody backend: dotenv-style secrets file (custody module). */
+  LITHIS_SECRETS_FILE: z.string().min(1).optional(),
   /** Agent execution (agents module / distill in context). */
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   /** Context embeddings (OpenAI text-embedding-3-small); unset → FTS-only search. */
@@ -48,6 +50,7 @@ export interface ServerConfig {
   port: number;
   databaseUrl?: string;
   objectStoreUrl?: string;
+  secretsFile?: string;
   anthropicApiKey?: string;
   openaiApiKey?: string;
   blobDir?: string;
@@ -73,6 +76,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     port: parsed.PORT,
     ...(parsed.DATABASE_URL !== undefined ? { databaseUrl: parsed.DATABASE_URL } : {}),
     ...(parsed.OBJECT_STORE_URL !== undefined ? { objectStoreUrl: parsed.OBJECT_STORE_URL } : {}),
+    ...(parsed.LITHIS_SECRETS_FILE !== undefined ? { secretsFile: parsed.LITHIS_SECRETS_FILE } : {}),
     ...(parsed.ANTHROPIC_API_KEY !== undefined ? { anthropicApiKey: parsed.ANTHROPIC_API_KEY } : {}),
     ...(parsed.OPENAI_API_KEY !== undefined ? { openaiApiKey: parsed.OPENAI_API_KEY } : {}),
     ...(parsed.LITHIS_BLOB_DIR !== undefined ? { blobDir: parsed.LITHIS_BLOB_DIR } : {}),
