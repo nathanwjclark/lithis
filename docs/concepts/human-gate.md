@@ -78,3 +78,16 @@ sends. The clock drives both, but they are different machines on purpose.
 `delivery` renders requests as cards/digests/nudges and routes them to
 Slack/Teams/email **via connectors' `act()`** (and the portal Inbox). Channel
 preference lives in `routing.channelPrefs`; every send emits `delivery.sent`.
+
+## Implemented in
+
+Phase **P2-gate**: `apps/server/src/humangate/service.ts` (request/resolve/inbox
+over Postgres, events on the transactional outbox) and `sla.ts` (the SLA
+ladder run by the clock's `humangate.sla` TickSource — first breach follows up
+with the current assignee, each further breach escalates along
+`escalationPath`, an exhausted path expires the request; emitting
+`humangate.follow_up` / `humangate.escalated` / `humangate.expired`).
+Role-string assignees are tenant-visible in the inbox until role membership
+lands with the policy layer. **Supersession is not implemented here** — it is
+the Invalidator's move and lands with cascades in P8-process
+(`humangate.superseded` is registered and waiting).
