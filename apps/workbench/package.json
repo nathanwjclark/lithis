@@ -1,0 +1,14 @@
+{
+  "name": "@lithis/workbench",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Cloud Claude Code environment: per-tenant containers, real web app, PR-only egress.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*"
+  }
+}

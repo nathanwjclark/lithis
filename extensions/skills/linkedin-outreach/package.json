@@ -1,0 +1,14 @@
+{
+  "name": "@lithis/skill-linkedin-outreach",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Path-ranked LinkedIn outreach skill: proposes ActionIntent batches; executes only approved connect/message actions.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*"
+  }
+}

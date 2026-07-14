@@ -16,11 +16,185 @@
         "typescript": "^5.7.0",
       },
     },
+    "apps/browserhost": {
+      "name": "@lithis/browserhost",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "apps/portal": {
+      "name": "@lithis/portal",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7",
+      },
+    },
+    "apps/server": {
+      "name": "@lithis/server",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "hono": "^4.12.30",
+        "zod": "^3.24.0",
+      },
+    },
+    "apps/workbench": {
+      "name": "@lithis/workbench",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+      },
+    },
+    "extensions/connectors/filedrop": {
+      "name": "@lithis/connector-filedrop",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/connectors/github": {
+      "name": "@lithis/connector-github",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/connectors/google-workspace": {
+      "name": "@lithis/connector-google-workspace",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/connectors/linkedin": {
+      "name": "@lithis/connector-linkedin",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/connectors/microsoft-365": {
+      "name": "@lithis/connector-microsoft-365",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/connectors/slack": {
+      "name": "@lithis/connector-slack",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/packs/insurance-brokerage": {
+      "name": "@lithis/pack-insurance-brokerage",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/packs/linkedin-bd": {
+      "name": "@lithis/pack-linkedin-bd",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "extensions/skills/follow-up-cadence": {
+      "name": "@lithis/skill-follow-up-cadence",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+      },
+    },
+    "extensions/skills/linkedin-outreach": {
+      "name": "@lithis/skill-linkedin-outreach",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+      },
+    },
+    "extensions/skills/weekly-report": {
+      "name": "@lithis/skill-weekly-report",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+      },
+    },
+    "packages/cli": {
+      "name": "@lithis/cli",
+      "version": "0.0.1",
+      "bin": {
+        "lithis": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+      },
+      "devDependencies": {
+        "@lithis/evals": "workspace:*",
+      },
+    },
     "packages/core": {
       "name": "@lithis/core",
       "version": "0.0.1",
       "dependencies": {
         "zod": "^3.24.0",
+      },
+    },
+    "packages/evals": {
+      "name": "@lithis/evals",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+    },
+    "packages/sdk": {
+      "name": "@lithis/sdk",
+      "version": "0.0.1",
+      "dependencies": {
+        "@lithis/core": "workspace:*",
+        "@lithis/stubkit": "workspace:*",
+        "zod": "^3.24.0",
+      },
+      "devDependencies": {
+        "@lithis/evals": "workspace:*",
       },
     },
     "packages/stubkit": {
@@ -72,15 +246,51 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
+    "@lithis/browserhost": ["@lithis/browserhost@workspace:apps/browserhost"],
+
+    "@lithis/cli": ["@lithis/cli@workspace:packages/cli"],
+
+    "@lithis/connector-filedrop": ["@lithis/connector-filedrop@workspace:extensions/connectors/filedrop"],
+
+    "@lithis/connector-github": ["@lithis/connector-github@workspace:extensions/connectors/github"],
+
+    "@lithis/connector-google-workspace": ["@lithis/connector-google-workspace@workspace:extensions/connectors/google-workspace"],
+
+    "@lithis/connector-linkedin": ["@lithis/connector-linkedin@workspace:extensions/connectors/linkedin"],
+
+    "@lithis/connector-microsoft-365": ["@lithis/connector-microsoft-365@workspace:extensions/connectors/microsoft-365"],
+
+    "@lithis/connector-slack": ["@lithis/connector-slack@workspace:extensions/connectors/slack"],
+
     "@lithis/core": ["@lithis/core@workspace:packages/core"],
 
     "@lithis/eslint-config": ["@lithis/eslint-config@workspace:tooling/eslint-config"],
+
+    "@lithis/evals": ["@lithis/evals@workspace:packages/evals"],
+
+    "@lithis/pack-insurance-brokerage": ["@lithis/pack-insurance-brokerage@workspace:extensions/packs/insurance-brokerage"],
+
+    "@lithis/pack-linkedin-bd": ["@lithis/pack-linkedin-bd@workspace:extensions/packs/linkedin-bd"],
+
+    "@lithis/portal": ["@lithis/portal@workspace:apps/portal"],
+
+    "@lithis/sdk": ["@lithis/sdk@workspace:packages/sdk"],
+
+    "@lithis/server": ["@lithis/server@workspace:apps/server"],
+
+    "@lithis/skill-follow-up-cadence": ["@lithis/skill-follow-up-cadence@workspace:extensions/skills/follow-up-cadence"],
+
+    "@lithis/skill-linkedin-outreach": ["@lithis/skill-linkedin-outreach@workspace:extensions/skills/linkedin-outreach"],
+
+    "@lithis/skill-weekly-report": ["@lithis/skill-weekly-report@workspace:extensions/skills/weekly-report"],
 
     "@lithis/stubkit": ["@lithis/stubkit@workspace:packages/stubkit"],
 
     "@lithis/stubscan": ["@lithis/stubscan@workspace:tooling/stubscan"],
 
     "@lithis/tsconfig": ["@lithis/tsconfig@workspace:tooling/tsconfig"],
+
+    "@lithis/workbench": ["@lithis/workbench@workspace:apps/workbench"],
 
     "@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
 

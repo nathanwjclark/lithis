@@ -1,0 +1,23 @@
+# lithis server — modular monolith (role flags: api | orchestrator | worker | all).
+# Built from the repo root: docker build -f deploy/docker/Dockerfile.server .
+# (docker-compose.yml and deploy/gcp/50-build-images.sh both use context ".")
+FROM oven/bun:1
+
+WORKDIR /app
+
+# The whole Bun workspace: root manifests + every workspace package.
+# bun.lock* keeps the COPY working before the first lockfile lands.
+COPY package.json bun.lock* tsconfig.json ./
+COPY tooling/ tooling/
+COPY packages/ packages/
+COPY apps/ apps/
+COPY extensions/ extensions/
+
+RUN bun install
+
+ENV PORT=4400
+EXPOSE 4400
+
+# LITHIS_ROLE (api|orchestrator|worker|all), DATABASE_URL, OBJECT_STORE_URL
+# are provided by the environment (compose file locally, Cloud Run on GCP).
+CMD ["bun", "apps/server/src/main.ts"]

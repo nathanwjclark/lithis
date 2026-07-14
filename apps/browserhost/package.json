@@ -1,0 +1,15 @@
+{
+  "name": "@lithis/browserhost",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Headed-Chrome session pods: custody-mounted sealed profiles, CDP broker, timing-only humanization, CAPTCHA = pause + notify.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}

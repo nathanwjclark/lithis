@@ -124,4 +124,11 @@ export default [
       "lithis/no-bare-stub": "off",
     },
   },
+  {
+    // stubkit IS the machinery — the one legitimate NotImplementedError thrower.
+    files: ["packages/stubkit/**"],
+    rules: {
+      "lithis/no-bare-stub": "off",
+    },
+  },
 ];

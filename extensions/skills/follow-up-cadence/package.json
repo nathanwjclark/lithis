@@ -1,0 +1,14 @@
+{
+  "name": "@lithis/skill-follow-up-cadence",
+  "private": true,
+  "version": "0.0.1",
+  "description": "External-party follow-up skill: works WorkItem.followUp cadences (regulators, carriers) via approved channel sends.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*"
+  }
+}

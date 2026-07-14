@@ -1,0 +1,16 @@
+{
+  "name": "@lithis/connector-linkedin",
+  "private": true,
+  "version": "0.0.1",
+  "description": "LinkedIn connector (browser_session): Sales Navigator search + profile feeds, connect/message actions — everything ingested is degree 2.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/sdk": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}

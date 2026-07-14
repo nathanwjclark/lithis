@@ -1,0 +1,14 @@
+{
+  "name": "@lithis/skill-weekly-report",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Weekly activity/relationship digest skill: searches context, renders a report, hands it to delivery.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@lithis/evals",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Eval harness contracts: fixture cases/suites/verdicts, event-log replay interfaces, and the expectStub() helper every package's stub tests use.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}
