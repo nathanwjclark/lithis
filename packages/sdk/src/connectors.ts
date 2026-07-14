@@ -104,6 +104,22 @@ export interface Connector {
 export type ConnectorHooks = Pick<Connector, "sync" | "act" | "health">;
 
 /**
+ * The auth path connectors use (mirrors the server's ConnectorRuntime seam in
+ * apps/server/src/connections): custody mints the BrokeredAuth — whose `token`
+ * is an opaque brokerToken, NEVER secret material — and redeem() exchanges
+ * that token for the actual header/token at call time, inside server-side
+ * connector code. Connectors that need authenticated calls register with the
+ * runtime as a ConnectorFactory over this provider.
+ */
+export interface ConnectorAuthProvider {
+  getAuth(connection: Connection): Promise<BrokeredAuth>;
+  redeem(brokerToken: string): Promise<string>;
+}
+
+/** Factory form a connector exports when its hooks need authenticated calls. */
+export type ConnectorFactory = (auth: ConnectorAuthProvider) => Connector;
+
+/**
  * Define a connector: validates the manifest (throws ZodError on a bad one)
  * and returns the assembled Connector. Fully implemented — this is authoring
  * machinery, not a service.
