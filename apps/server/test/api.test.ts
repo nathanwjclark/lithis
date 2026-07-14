@@ -1,17 +1,37 @@
 import { describe, expect, test } from "bun:test";
 import { newUlid } from "@lithis/core";
 import { buildApp } from "../src/api";
-import { createContextStore } from "../src/context";
-// No humanGate or workQueue: both are real as of P2/P5 and need Postgres —
-// this DB-less app exercises the 503 paths; the real routes are covered in
-// test/integration/{humangate,work}.pg.test.ts.
+import type { ContextStore } from "../src/context";
+
+/**
+ * In-test ContextStore double (context is REAL as of P4 — its Postgres
+ * behavior is covered in test/integration/context.pg.test.ts; these api tests
+ * only exercise route plumbing, so a recording fake is exactly right here).
+ * No humanGate or workQueue: both are real as of P2/P5 and need Postgres —
+ * this DB-less app exercises their 503 paths.
+ */
+const searchCalls: unknown[] = [];
+const fixtureDocId = newUlid();
+const fakeContextStore: ContextStore = {
+  putBlob: async () => ({ kind: "blob", id: fixtureDocId }),
+  ingestDoc: async () => ({ kind: "doc", id: fixtureDocId }),
+  distill: async () => {
+    throw new Error("not exercised by api tests");
+  },
+  search: async (q) => {
+    searchCalls.push(q);
+    return [{ ref: { kind: "doc", id: fixtureDocId }, score: 0.5, excerpt: `hit for ${q.text}` }];
+  },
+  paths: async () => [],
+};
+
 const app = buildApp({
   role: "all",
-  contextStore: createContextStore(),
+  contextStore: fakeContextStore,
   startedAtMs: Date.now() - 5_000,
 });
 
-/** Dev-header identity for the placeholder routes (fixture ULIDs). */
+/** Dev-header identity for the routes (fixture ULIDs). */
 const identity = {
   "x-lithis-tenant": newUlid(),
   "x-lithis-principal": newUlid(),
@@ -39,10 +59,10 @@ describe("GET /stubs", () => {
     };
     expect(census.total).toBeGreaterThan(0);
     const ids = census.records.map((r) => r.id);
-    expect(ids).toContain("server.context.store.search");
-    // work (P5) and humangate (P2) went real — their stub ids left the census.
+// work (P5), humangate (P2), and context (P4) went real — their stub ids left the census.
     expect(ids.filter((id) => id.startsWith("server.work."))).toEqual([]);
     expect(ids.filter((id) => id.startsWith("server.humangate."))).toEqual([]);
+    expect(ids.filter((id) => id.startsWith("server.context."))).toEqual([]);
     for (const r of census.records) {
       expect(r.reason).toStartWith("LITHIS-STUB:");
     }
@@ -66,11 +86,58 @@ describe("placeholder domain routes answer 501 with the stub id", () => {
     const res = await app.request("/api/work/claim", { method: "POST", headers: identity });
     expect(res.status).toBe(503);
   });
+});
 
-  test("GET /api/context/search → 501 with server.context.store.search", async () => {
-    const res = await app.request("/api/context/search?q=loss+runs", { headers: identity });
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { stubId: string }).stubId).toBe("server.context.store.search");
+describe("context routes are real", () => {
+  test("GET /api/context/search → 200 with ScoredRefs and parsed params", async () => {
+    const res = await app.request(
+      "/api/context/search?q=loss+runs&audience=all&limit=5&docType=email",
+      { headers: identity },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ref: { kind: string }; excerpt: string }[];
+    expect(body.length).toBe(1);
+    expect(body[0]!.ref.kind).toBe("doc");
+    expect(body[0]!.excerpt).toContain("loss runs");
+    expect(searchCalls.at(-1)).toEqual({
+      text: "loss runs",
+      audience: "all",
+      limit: 5,
+      docTypes: ["email"],
+    });
+  });
+
+  test("GET /api/context/search rejects a bad audience with 400", async () => {
+    const res = await app.request("/api/context/search?q=x&audience=everyone", {
+      headers: identity,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/context/docs → 201 with blob + doc refs", async () => {
+    const res = await app.request("/api/context/docs", {
+      method: "POST",
+      headers: { ...identity, "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "note",
+        slug: "hello-note",
+        title: "Hello",
+        text: "Some ingested text.",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { blob: { kind: string }; doc: { kind: string } };
+    expect(body.blob.kind).toBe("blob");
+    expect(body.doc.kind).toBe("doc");
+  });
+
+  test("POST /api/context/docs rejects an invalid body with 400", async () => {
+    const res = await app.request("/api/context/docs", {
+      method: "POST",
+      headers: { ...identity, "content-type": "application/json" },
+      body: JSON.stringify({ title: "missing everything else" }),
+    });
+    expect(res.status).toBe(400);
   });
 });
 
