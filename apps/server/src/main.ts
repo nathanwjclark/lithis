@@ -22,7 +22,11 @@ import { createCustody, createEnvFileBackend } from "./custody";
 import { createDelivery } from "./delivery";
 import { createHumanGate, slaTickSource } from "./humangate";
 import { createIdentityService, createPolicyEngine } from "./iam";
-import { createProcessEngine } from "./processes";
+import {
+  createProcessEngine,
+  createUnconfiguredProcessEngine,
+  subscribeProcessEngine,
+} from "./processes";
 import { createWatcherHost } from "./sentinel";
 import { createSkillRegistry } from "./skills";
 import { createSorRuntime } from "./sor";
@@ -82,17 +86,20 @@ export async function boot(): Promise<void> {
     return { custody, connectorRuntime, connectionRegistry };
   })();
 
-  // P7-agents wiring: the resident-agent runtime builds its own thin service
-  // instances over the shared db/spine (identity/workQueue/contextStore are
-  // stateless factories, so the duplicates are harmless).
+  const workQueue = db !== undefined && spine !== undefined ? createWorkQueue(db, spine) : undefined;
+  const humanGate = db !== undefined && spine !== undefined ? createHumanGate(db, spine) : undefined;
+
+  // P7-agents wiring: the resident-agent runtime shares the hoisted work queue
+  // (identity/contextStore are stateless factories, so those duplicates are
+  // harmless).
   const agents =
-    db !== undefined && spine !== undefined
+    db !== undefined && spine !== undefined && workQueue !== undefined
       ? createAgentsRuntime({
           db,
           spine,
           config,
           identity: createIdentityService(db, spine),
-          workQueue: createWorkQueue(db, spine),
+          workQueue,
           contextStore: createContextStore(db, spine, contextDepsFromConfig(config)),
         })
       : undefined;
@@ -112,9 +119,20 @@ export async function boot(): Promise<void> {
       db !== undefined && spine !== undefined
         ? createContextStore(db, spine, contextDepsFromConfig(config))
         : createUnconfiguredContextStore(),
-    ...(db !== undefined && spine !== undefined ? { workQueue: createWorkQueue(db, spine) } : {}),
-    processEngine: createProcessEngine(),
-    ...(db !== undefined && spine !== undefined ? { humanGate: createHumanGate(db, spine) } : {}),
+    ...(workQueue !== undefined ? { workQueue } : {}),
+    processEngine:
+      db !== undefined && spine !== undefined && workQueue !== undefined && humanGate !== undefined
+        ? createProcessEngine({
+            db,
+            spine,
+            work: workQueue,
+            gate: humanGate,
+            ...(config.cascadeAutoWidth !== undefined
+              ? { autoExecuteMaxWidth: config.cascadeAutoWidth }
+              : {}),
+          })
+        : createUnconfiguredProcessEngine(),
+    ...(humanGate !== undefined ? { humanGate } : {}),
     ...(agents !== undefined
       ? { agentHost: agents.host, agentExecutor: agents.executor, toolBroker: agents.toolBroker }
       : {
@@ -137,6 +155,9 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   }
   if (clock !== undefined && agents !== undefined) {
     clock.registerSource(agents.heartbeatTickSource);
+  }
+  if (spine !== undefined && workQueue !== undefined && humanGate !== undefined) {
+    subscribeProcessEngine(spine, services.processEngine);
   }
 
   console.log(`lithis server — role=${config.role} port=${config.port}`);
