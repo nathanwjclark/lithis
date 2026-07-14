@@ -295,7 +295,7 @@ describePg("humangate HTTP routes (integration)", () => {
     return buildApp({
       role: "all",
       humanGate: createHumanGate(db, spine),
-      workQueue: createWorkQueue(),
+      workQueue: createWorkQueue(db, spine),
       contextStore: createContextStore(),
     });
   }
@@ -439,7 +439,7 @@ describePg("humangate HTTP routes (integration)", () => {
 
 describe("humangate HTTP routes (db-less)", () => {
   // Complements apps/server/test/api.test.ts: identity errors still win over 503.
-  const dblessApp = buildApp({ role: "all", workQueue: createWorkQueue(), contextStore: createContextStore() });
+  const dblessApp = buildApp({ role: "all", contextStore: createContextStore() });
 
   test("resolve route answers 503 after identity passes, 400 without identity", async () => {
     const noIdentity = await dblessApp.request(`/api/humangate/${newUlid()}/resolve`, {

@@ -39,9 +39,9 @@ describe("GET /stubs", () => {
     };
     expect(census.total).toBeGreaterThan(0);
     const ids = census.records.map((r) => r.id);
-    expect(ids).toContain("server.work.queue.claim");
     expect(ids).toContain("server.context.store.search");
-    // humangate went real in P2-gate — its stub ids are gone from the census.
+    // work (P5) and humangate (P2) went real — their stub ids left the census.
+    expect(ids.filter((id) => id.startsWith("server.work."))).toEqual([]);
     expect(ids.filter((id) => id.startsWith("server.humangate."))).toEqual([]);
     for (const r of census.records) {
       expect(r.reason).toStartWith("LITHIS-STUB:");
