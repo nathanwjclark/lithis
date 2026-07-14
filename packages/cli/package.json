@@ -1,0 +1,20 @@
+{
+  "name": "@lithis/cli",
+  "private": true,
+  "version": "0.0.1",
+  "description": "The `lithis` CLI: init, dev, migrate, stubs, eval, new:{connector,skill,pack}.",
+  "type": "module",
+  "bin": {
+    "lithis": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@lithis/evals": "workspace:*"
+  }
+}

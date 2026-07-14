@@ -1,0 +1,10 @@
+{
+  "name": "@lithis/stubkit",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Loud, deterministic, searchable stubs: stub() throws NotImplementedError and registers in an enumerable StubRegistry. The one package that is never allowed to be stubbed.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

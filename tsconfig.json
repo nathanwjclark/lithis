@@ -1,0 +1,29 @@
+{
+  "extends": "./tooling/tsconfig/base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@lithis/core": ["packages/core/src/index.ts"],
+      "@lithis/core/*": ["packages/core/src/*"],
+      "@lithis/stubkit": ["packages/stubkit/src/index.ts"],
+      "@lithis/sdk": ["packages/sdk/src/index.ts"],
+      "@lithis/sdk/*": ["packages/sdk/src/*"],
+      "@lithis/evals": ["packages/evals/src/index.ts"],
+      "@lithis/cli": ["packages/cli/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "packages/*/test/**/*",
+    "apps/*/src/**/*",
+    "apps/*/test/**/*",
+    "tooling/eslint-config/src/**/*",
+    "tooling/stubscan/src/**/*",
+    "tooling/stubscan/test/**/*",
+    "extensions/connectors/*/src/**/*",
+    "extensions/skills/*/src/**/*",
+    "extensions/packs/*/src/**/*",
+    "extensions/packs/*/test/**/*"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

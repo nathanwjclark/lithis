@@ -1,0 +1,11 @@
+{
+  "name": "@lithis/eslint-config",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Flat ESLint config with lithis custom rules: server module boundaries and no bare TODO-throws (use @lithis/stubkit).",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  }
+}

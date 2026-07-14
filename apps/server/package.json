@@ -1,0 +1,16 @@
+{
+  "name": "@lithis/server",
+  "private": true,
+  "version": "0.0.1",
+  "description": "The lithis backend deployable — a modular monolith (role flags api|orchestrator|worker|all): spine, iam, custody, context, work, processes, humangate, agents, connections, delivery, skills, artifacts, sor, sentinel, api.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "hono": "^4.12.30",
+    "zod": "^3.24.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@lithis/connector-filedrop",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Filedrop connector: watched SFTP/S3 paths where counterparties drop files (carrier loss runs, statements).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/sdk": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}

@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
+
+      - name: Stub census (honesty gate)
+        run: bun run stubscan --json stub-census.json
+
+      - name: Lint (module boundaries + no bare stubs)
+        run: bun run lint
+
+      - name: Upload stub census
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stub-census
+          path: stub-census.json
+          if-no-files-found: ignore

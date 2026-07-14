@@ -1,0 +1,15 @@
+{
+  "name": "@lithis/pack-linkedin-bd",
+  "private": true,
+  "version": "0.0.1",
+  "description": "LinkedIn BD expansion pack: Sales Navigator selector pack (stub until the crm scraper migrates) + the BD resident-agent charter.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@lithis/sdk",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Typed lithis API client + authoring kits: connectors, skills, templates, browser toolkit.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./connectors": "./src/connectors.ts",
+    "./skills": "./src/skills.ts",
+    "./templates": "./src/templates.ts",
+    "./browser": "./src/browser.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@lithis/evals": "workspace:*"
+  }
+}

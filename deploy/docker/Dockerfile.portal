@@ -1,0 +1,20 @@
+# lithis portal — the React admin app (Home, Inbox, Work, ..., What's-real-yet).
+# Built from the repo root: docker build -f deploy/docker/Dockerfile.portal .
+# (docker-compose.yml and deploy/gcp/50-build-images.sh both use context ".")
+FROM oven/bun:1
+
+WORKDIR /app
+
+COPY package.json bun.lock* tsconfig.json ./
+COPY tooling/ tooling/
+COPY packages/ packages/
+COPY apps/ apps/
+COPY extensions/ extensions/
+
+RUN bun install
+
+ENV PORT=4401
+EXPOSE 4401
+
+# LITHIS_SERVER_URL points at the lithis server (http://server:4400 in compose).
+CMD ["bun", "apps/portal/src/main.ts"]

@@ -1,0 +1,16 @@
+{
+  "name": "@lithis/connector-microsoft-365",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Microsoft 365 connector: Outlook mail/calendar + OneDrive feeds via Microsoft Graph.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/sdk": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@lithis/connector-google-workspace",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Google Workspace connector: Gmail/Calendar/Drive feeds, gmail.send + calendar.create actions.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@lithis/core": "workspace:*",
+    "@lithis/sdk": "workspace:*",
+    "@lithis/stubkit": "workspace:*",
+    "zod": "^3.24.0"
+  }
+}
