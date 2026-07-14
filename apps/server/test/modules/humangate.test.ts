@@ -1,14 +1,14 @@
+// humangate is REAL as of phase P2-gate — behavioral coverage lives in
+// test/humangate.sla.test.ts (pure SLA policy) and
+// test/integration/humangate.pg.test.ts (lifecycle + SLA sweep + routes).
+// This file remains only to document that the module intentionally has no
+// stub cases left.
 import { expect, test } from "bun:test";
-import { createHumanGate } from "../../src/humangate";
-import { describeStubService } from "../helpers/stub-services";
+import { StubRegistry } from "@lithis/stubkit";
 
-describeStubService({
-  name: "humangate HumanGate",
-  service: createHumanGate(),
-  idPrefix: "server.humangate.gate",
-  methods: ["request", "resolve", "inbox", "tick"],
-});
-
-test("humangate factory returns a singleton (stub ids register exactly once)", () => {
-  expect(createHumanGate()).toBe(createHumanGate());
+test("humangate registers no stubs — the module is implemented", () => {
+  const humangateStubs = StubRegistry.census().records.filter((r) =>
+    r.id.startsWith("server.humangate."),
+  );
+  expect(humangateStubs).toEqual([]);
 });
