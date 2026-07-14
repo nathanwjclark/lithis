@@ -8,7 +8,7 @@ import { createConnectionRegistry } from "./connections";
 import { createContextStore } from "./context";
 import { createCustody } from "./custody";
 import { createDelivery } from "./delivery";
-import { createHumanGate } from "./humangate";
+import { createHumanGate, slaTickSource } from "./humangate";
 import { createIdentityService, createPolicyEngine } from "./iam";
 import { createProcessEngine } from "./processes";
 import { createWatcherHost } from "./sentinel";
@@ -56,7 +56,7 @@ export async function boot(): Promise<void> {
     contextStore: createContextStore(),
     ...(db !== undefined && spine !== undefined ? { workQueue: createWorkQueue(db, spine) } : {}),
     processEngine: createProcessEngine(),
-    humanGate: createHumanGate(),
+    ...(db !== undefined && spine !== undefined ? { humanGate: createHumanGate(db, spine) } : {}),
     agentHost: createAgentHost(),
     agentExecutor: createAgentExecutor(),
     toolBroker: createToolBroker(),
@@ -68,8 +68,11 @@ export async function boot(): Promise<void> {
     watcherHost: createWatcherHost(),
   };
 
-  if (db !== undefined && spine !== undefined && clock !== undefined) {
+if (db !== undefined && spine !== undefined && clock !== undefined) {
     clock.registerSource(createLeaseReclaimTickSource(db, spine));
+  }
+  if (clock !== undefined && services.humanGate !== undefined) {
+    clock.registerSource(slaTickSource(services.humanGate));
   }
 
   console.log(`lithis server — role=${config.role} port=${config.port}`);
@@ -85,7 +88,7 @@ export async function boot(): Promise<void> {
   if (config.role === "api" || config.role === "all") {
     const app = buildApp({
       role: config.role,
-      humanGate: services.humanGate,
+...(services.humanGate !== undefined ? { humanGate: services.humanGate } : {}),
       ...(services.workQueue !== undefined ? { workQueue: services.workQueue } : {}),
       contextStore: services.contextStore,
     });

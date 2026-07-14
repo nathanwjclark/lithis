@@ -2,14 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { newUlid } from "@lithis/core";
 import { buildApp } from "../src/api";
 import { createContextStore } from "../src/context";
-import { createHumanGate } from "../src/humangate";
-
-// No workQueue: this suite exercises the DB-less surface (work is real as of
-// P5 and needs Postgres — its route behavior over a live queue is covered by
-// test/integration/work.pg.test.ts).
+// No humanGate or workQueue: both are real as of P2/P5 and need Postgres —
+// this DB-less app exercises the 503 paths; the real routes are covered in
+// test/integration/{humangate,work}.pg.test.ts.
 const app = buildApp({
   role: "all",
-  humanGate: createHumanGate(),
   contextStore: createContextStore(),
   startedAtMs: Date.now() - 5_000,
 });
@@ -42,8 +39,10 @@ describe("GET /stubs", () => {
     };
     expect(census.total).toBeGreaterThan(0);
     const ids = census.records.map((r) => r.id);
-    expect(ids).toContain("server.humangate.gate.inbox");
     expect(ids).toContain("server.context.store.search");
+    // work (P5) and humangate (P2) went real — their stub ids left the census.
+    expect(ids.filter((id) => id.startsWith("server.work."))).toEqual([]);
+    expect(ids.filter((id) => id.startsWith("server.humangate."))).toEqual([]);
     for (const r of census.records) {
       expect(r.reason).toStartWith("LITHIS-STUB:");
     }
@@ -51,12 +50,16 @@ describe("GET /stubs", () => {
 });
 
 describe("placeholder domain routes answer 501 with the stub id", () => {
-  test("GET /api/humangate/inbox → 501 { stubId, reason }", async () => {
-    const res = await app.request("/api/humangate/inbox", { headers: identity });
-    expect(res.status).toBe(501);
-    const body = (await res.json()) as { stubId: string; reason: string };
-    expect(body.stubId).toBe("server.humangate.gate.inbox");
-    expect(body.reason).toStartWith("LITHIS-STUB:");
+  test("humangate routes → 503 when the server booted without DATABASE_URL", async () => {
+    // Real module (P2-gate), missing dependency — a config condition, not a stub.
+    const inbox = await app.request("/api/humangate/inbox", { headers: identity });
+    expect(inbox.status).toBe(503);
+    const post = await app.request("/api/humangate/request", {
+      method: "POST",
+      headers: { ...identity, "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect(post.status).toBe(503);
   });
 
   test("POST /api/work/claim → 503 when the server has no database", async () => {

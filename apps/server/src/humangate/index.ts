@@ -5,7 +5,9 @@ import type {
   PrincipalContext,
   Ulid,
 } from "@lithis/core";
-import { stubService } from "@lithis/stubkit";
+import type { Db } from "../db";
+import type { EventSpine, TickSource } from "../spine";
+import { createPgHumanGate } from "./service";
 
 /**
  * humangate — THE human-in-the-loop primitive. One request shape (approval /
@@ -47,12 +49,18 @@ export interface HumanGate {
   tick(now: Date): Promise<FollowUpAction[]>;
 }
 
-const humanGate = stubService<HumanGate>(
-  "server.humangate.gate",
-  ["request", "resolve", "inbox", "tick"],
-  "LITHIS-STUB: human request lifecycle (routing, SLA follow-ups, escalation, supersession) not implemented",
-);
-
-export function createHumanGate(): HumanGate {
-  return humanGate;
+export function createHumanGate(db: Db, spine: EventSpine): HumanGate {
+  return createPgHumanGate(db, spine);
 }
+
+/** The clock registration for the SLA sweep (orchestrator role, db-backed boots only). */
+export function slaTickSource(gate: HumanGate): TickSource {
+  return {
+    id: "humangate.sla",
+    async tick(now: Date): Promise<void> {
+      await gate.tick(now);
+    },
+  };
+}
+
+export { HumanRequestNotFoundError } from "./service";
