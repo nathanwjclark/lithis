@@ -6,7 +6,7 @@ import {
   workItemSchema,
   workNoteSchema,
 } from "@lithis/core";
-import type { PrincipalContext, RunOutcome, WorkItemLease, WorkItemStatus } from "@lithis/core";
+import type { PrincipalContext, RunOutcome, WorkItem, WorkItemLease, WorkItemStatus } from "@lithis/core";
 import { txSql } from "../db";
 import type { Db, DbTx } from "../db";
 import type { EventSpine, TickSource } from "../spine";
@@ -85,6 +85,36 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
   }
 
   return {
+    async get(id: WorkItemId): Promise<WorkItem | null> {
+      const rows: Record<string, unknown>[] = await db.sql`
+        select * from work.work_items where id = ${id}`;
+      const row = rows[0];
+      if (row === undefined) return null;
+      const toIso = (v: unknown): unknown => (v instanceof Date ? v.toISOString() : v);
+      return workItemSchema.parse({
+        id: row["id"],
+        tenantId: row["tenant_id"],
+        kind: row["kind"],
+        title: row["title"],
+        body: row["body"],
+        status: row["status"],
+        ownerPrincipalId: row["owner_principal_id"],
+        priority: Number(row["priority"]),
+        ...(row["due_at"] !== null ? { dueAt: toIso(row["due_at"]) } : {}),
+        ...(row["wake_at"] !== null ? { wakeAt: toIso(row["wake_at"]) } : {}),
+        ...(row["schedule"] !== null ? { schedule: row["schedule"] } : {}),
+        ...(row["follow_up"] !== null ? { followUp: fromJsonb(row["follow_up"]) } : {}),
+        ...(row["process_run_id"] !== null ? { processRunId: row["process_run_id"] } : {}),
+        ...(row["node_key"] !== null ? { nodeKey: row["node_key"] } : {}),
+        attempt: row["attempt"],
+        ...(row["lease"] !== null ? { lease: fromJsonb(row["lease"]) } : {}),
+        sourceRefs: fromJsonb(row["source_refs"]),
+        revision: row["revision"],
+        createdAt: toIso(row["created_at"]),
+        updatedAt: toIso(row["updated_at"]),
+      });
+    },
+
     async open(item: NewWorkItem): Promise<WorkItemId> {
       const id = newUlid();
       const at = nowIso();

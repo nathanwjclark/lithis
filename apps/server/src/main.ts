@@ -2,7 +2,12 @@ import { StubRegistry } from "@lithis/stubkit";
 import { buildApp } from "./api";
 import { loadConfig } from "./config";
 import { applyMigrations, collectMigrations, createDb } from "./db";
-import { createAgentExecutor, createAgentHost, createToolBroker } from "./agents";
+import {
+  createAgentsRuntime,
+  createToolBroker,
+  createUnconfiguredAgentExecutor,
+  createUnconfiguredAgentHost,
+} from "./agents";
 import { createArtifactEngine } from "./artifacts";
 import {
   createConnectionRegistry,
@@ -77,6 +82,21 @@ export async function boot(): Promise<void> {
     return { custody, connectorRuntime, connectionRegistry };
   })();
 
+  // P7-agents wiring: the resident-agent runtime builds its own thin service
+  // instances over the shared db/spine (identity/workQueue/contextStore are
+  // stateless factories, so the duplicates are harmless).
+  const agents =
+    db !== undefined && spine !== undefined
+      ? createAgentsRuntime({
+          db,
+          spine,
+          config,
+          identity: createIdentityService(db, spine),
+          workQueue: createWorkQueue(db, spine),
+          contextStore: createContextStore(db, spine, contextDepsFromConfig(config)),
+        })
+      : undefined;
+
   // Instantiate all module services so the census below is complete.
   const services = {
     ...(spine !== undefined ? { eventSpine: spine } : {}),
@@ -95,9 +115,13 @@ export async function boot(): Promise<void> {
     ...(db !== undefined && spine !== undefined ? { workQueue: createWorkQueue(db, spine) } : {}),
     processEngine: createProcessEngine(),
     ...(db !== undefined && spine !== undefined ? { humanGate: createHumanGate(db, spine) } : {}),
-    agentHost: createAgentHost(),
-    agentExecutor: createAgentExecutor(),
-    toolBroker: createToolBroker(),
+    ...(agents !== undefined
+      ? { agentHost: agents.host, agentExecutor: agents.executor, toolBroker: agents.toolBroker }
+      : {
+          agentHost: createUnconfiguredAgentHost(),
+          agentExecutor: createUnconfiguredAgentExecutor(),
+          toolBroker: createToolBroker(),
+        }),
     delivery: createDelivery(),
     skillRegistry: createSkillRegistry(),
     artifactEngine: createArtifactEngine(),
@@ -110,6 +134,9 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   }
   if (clock !== undefined && services.humanGate !== undefined) {
     clock.registerSource(slaTickSource(services.humanGate));
+  }
+  if (clock !== undefined && agents !== undefined) {
+    clock.registerSource(agents.heartbeatTickSource);
   }
 
   console.log(`lithis server — role=${config.role} port=${config.port}`);

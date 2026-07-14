@@ -83,6 +83,10 @@ export async function truncateAll(db: Db): Promise<void> {
       context.relationship_scores,
       connections.connections,
       connections.feed_expectations,
-      connections.credentials
+      connections.credentials,
+      agents.sessions,
+      agents.runs,
+      agents.run_results,
+      agents.evidence
     cascade`;
 }
