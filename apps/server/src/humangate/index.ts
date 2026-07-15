@@ -43,6 +43,8 @@ export interface FollowUpAction {
 
 export interface HumanGate {
   request(r: NewHumanRequest): Promise<HumanRequest>;
+  /** Tenant-scoped point lookup — server-internal consumers (delivery cards) load the full record. */
+  get(id: Ulid, tenantId: Ulid): Promise<HumanRequest | undefined>;
   /** Validates the HUMAN_REQUEST_TRANSITIONS table; deny/modify triggers the Invalidator. */
   resolve(id: Ulid, res: HumanResolution, by: PrincipalContext): Promise<HumanRequest>;
   inbox(p: PrincipalContext, f?: InboxFilter): Promise<HumanRequest[]>;

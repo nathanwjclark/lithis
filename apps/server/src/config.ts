@@ -40,6 +40,8 @@ const envSchema = z.object({
   /** Slack delivery + inbound Socket Mode (delivery module + slack connector). */
   SLACK_BOT_TOKEN: z.string().min(1).optional(),
   SLACK_APP_TOKEN: z.string().min(1).optional(),
+  /** Default Slack channel id evidence cards post to (delivery module). */
+  SLACK_DELIVERY_CHANNEL: z.string().min(1).optional(),
   /** Google Workspace connector OAuth client. */
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
@@ -64,6 +66,7 @@ export interface ServerConfig {
   cascadeAutoWidth?: number;
   slackBotToken?: string;
   slackAppToken?: string;
+  slackDeliveryChannel?: string;
   googleClientId?: string;
   googleClientSecret?: string;
   msClientId?: string;
@@ -96,6 +99,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       : {}),
     ...(parsed.SLACK_BOT_TOKEN !== undefined ? { slackBotToken: parsed.SLACK_BOT_TOKEN } : {}),
     ...(parsed.SLACK_APP_TOKEN !== undefined ? { slackAppToken: parsed.SLACK_APP_TOKEN } : {}),
+    ...(parsed.SLACK_DELIVERY_CHANNEL !== undefined
+      ? { slackDeliveryChannel: parsed.SLACK_DELIVERY_CHANNEL }
+      : {}),
     ...(parsed.GOOGLE_CLIENT_ID !== undefined ? { googleClientId: parsed.GOOGLE_CLIENT_ID } : {}),
     ...(parsed.GOOGLE_CLIENT_SECRET !== undefined
       ? { googleClientSecret: parsed.GOOGLE_CLIENT_SECRET }

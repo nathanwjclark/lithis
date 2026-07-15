@@ -9,6 +9,7 @@
       "@lithis/sdk": ["packages/sdk/src/index.ts"],
       "@lithis/sdk/*": ["packages/sdk/src/*"],
       "@lithis/evals": ["packages/evals/src/index.ts"],
+      "@lithis/connector-slack": ["extensions/connectors/slack/src/index.ts"],
       "@lithis/cli": ["packages/cli/src/index.ts"]
     }
   },

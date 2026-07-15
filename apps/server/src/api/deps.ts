@@ -1,4 +1,6 @@
+import type { Connection, Ulid } from "@lithis/core";
 import type { ContextStore } from "../context";
+import type { Delivery } from "../delivery";
 import type { HumanGate } from "../humangate";
 import type { WorkQueue } from "../work";
 import type { ServerRole } from "../config";
@@ -15,6 +17,10 @@ export interface ApiDeps {
   /** Absent when the server runs without a database — work routes answer 503. */
   workQueue?: WorkQueue;
   contextStore: ContextStore;
+  /** Absent when the server runs without a database — delivery routes answer 503. */
+  delivery?: Delivery;
+  /** Resolves the tenant's slack connection for the inbound events ingress. */
+  slackConnectionFor?: (tenantId: Ulid) => Promise<Connection | undefined>;
   /** Injectable for tests; defaults to construction time. */
   startedAtMs?: number;
 }

@@ -11,6 +11,7 @@ const MODULES_WITH_MIGRATIONS = [
   "context",
   "processes",
   "connections",
+  "delivery",
   "skills",
   "artifacts",
   "sor",
@@ -35,7 +36,7 @@ describe("collectMigrations (real filesystem)", () => {
 
   test("modules without tables are skipped", () => {
     const modules = new Set(plan.map((m) => m.module));
-    for (const skipped of ["custody", "delivery", "sentinel", "api"]) {
+    for (const skipped of ["custody", "sentinel", "api"]) {
       expect(modules.has(skipped as (typeof plan)[number]["module"])).toBe(false);
     }
   });
@@ -84,6 +85,7 @@ describe("collectMigrations (real filesystem)", () => {
       "connections.connections",
       "connections.feed_expectations",
       "connections.credentials",
+      "delivery.deliveries",
       "skills.skills",
       "skills.skill_versions",
       "skills.report_definitions",
