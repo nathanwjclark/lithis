@@ -11,5 +11,17 @@ export const T_CONVERSATION_MESSAGE = defineEventType({
     direction: z.enum(["inbound", "outbound"]),
     channel: z.enum(["slack", "teams", "email", "portal"]),
     docId: ulidSchema,
+    /** Connection the message arrived through / left by, when channel-transported. */
+    connectionId: ulidSchema.optional(),
+    /** Channel-native id of THIS message — for Slack, "channel:ts". */
+    externalId: z.string().optional(),
+    /** Channel-native id of the thread parent, when the message is a reply — for
+     * Slack, "channel:thread_ts"; matches the delivery record's externalId anchor. */
+    threadExternalId: z.string().optional(),
+    /** Channel-native author id (Slack user id, email address, ...). */
+    authorExternalId: z.string().optional(),
+    /** Message text, inline so subscribers (resolve mapping, welfare watchers)
+     * need no doc fetch. The quarantined doc remains the record of truth. */
+    text: z.string().optional(),
   }),
 });

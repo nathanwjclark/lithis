@@ -18,8 +18,14 @@ import {
   createSyncTickSource,
 } from "./connections";
 import { contextDepsFromConfig, createContextStore, createUnconfiguredContextStore } from "./context";
+import { createSlackConnector } from "@lithis/connector-slack";
 import { createCustody, createEnvFileBackend } from "./custody";
-import { createDelivery } from "./delivery";
+import {
+  attachDeliverySubscriptions,
+  createDelivery,
+  createSocketModeClient,
+  createUnconfiguredDelivery,
+} from "./delivery";
 import { createHumanGate, slaTickSource } from "./humangate";
 import { createIdentityService, createPolicyEngine } from "./iam";
 import {
@@ -72,26 +78,33 @@ export async function boot(): Promise<void> {
       credentials,
       backend: createEnvFileBackend(config.secretsFile),
     });
-    const connectorRuntime = createConnectorRuntime({
-      getAuth: async (connection) => {
+    const authProvider = {
+      getAuth: async (connection: import("@lithis/core").Connection) => {
         const auth = await custody.issueFor(connection.credentialRef, connection.tenantId, {
-          kind: "connection",
+          kind: "connection" as const,
           id: connection.id,
         });
         return { kind: auth.kind, token: auth.brokerToken, expiresAt: auth.expiresAt };
       },
-      redeem: async (brokerToken) => (await custody.redeem(brokerToken)).secret,
-    });
+      redeem: async (brokerToken: string) => (await custody.redeem(brokerToken)).secret,
+    };
+    const connectorRuntime = createConnectorRuntime(authProvider);
+    connectorRuntime.register(createSlackConnector); // P6-deliver: slack is a first-class citizen of every db-backed boot
     const connectionRegistry = createConnectionRegistry(db, spine, { probes: connectorRuntime });
-    return { custody, connectorRuntime, connectionRegistry };
+    return { custody, authProvider, connectorRuntime, connectionRegistry };
   })();
 
+  // Hoisted shared services: delivery composes over humangate/context/
+  // connectivity, and the agents runtime shares the work queue + context store
+  // (identity is a stateless factory, so its duplicate is harmless).
   const workQueue = db !== undefined && spine !== undefined ? createWorkQueue(db, spine) : undefined;
   const humanGate = db !== undefined && spine !== undefined ? createHumanGate(db, spine) : undefined;
+  const contextStore =
+    db !== undefined && spine !== undefined
+      ? createContextStore(db, spine, contextDepsFromConfig(config))
+      : createUnconfiguredContextStore();
 
-  // P7-agents wiring: the resident-agent runtime shares the hoisted work queue
-  // (identity/contextStore are stateless factories, so those duplicates are
-  // harmless).
+  // P7-agents wiring.
   const agents =
     db !== undefined && spine !== undefined && workQueue !== undefined
       ? createAgentsRuntime({
@@ -100,9 +113,26 @@ export async function boot(): Promise<void> {
           config,
           identity: createIdentityService(db, spine),
           workQueue,
-          contextStore: createContextStore(db, spine, contextDepsFromConfig(config)),
+          contextStore,
         })
       : undefined;
+
+  // P6-deliver wiring.
+  const delivery =
+    db !== undefined && spine !== undefined && connectivity !== undefined && humanGate !== undefined
+      ? createDelivery({
+          db,
+          spine,
+          humanGate,
+          runtime: connectivity.connectorRuntime,
+          auth: connectivity.authProvider,
+          connections: connectivity.connectionRegistry,
+          contextStore,
+          ...(config.slackDeliveryChannel !== undefined
+            ? { slackChannel: config.slackDeliveryChannel }
+            : {}),
+        })
+      : createUnconfiguredDelivery();
 
   // Instantiate all module services so the census below is complete.
   const services = {
@@ -115,10 +145,7 @@ export async function boot(): Promise<void> {
     ...(connectivity !== undefined
       ? { custody: connectivity.custody, connectionRegistry: connectivity.connectionRegistry }
       : {}),
-    contextStore:
-      db !== undefined && spine !== undefined
-        ? createContextStore(db, spine, contextDepsFromConfig(config))
-        : createUnconfiguredContextStore(),
+    contextStore,
     ...(workQueue !== undefined ? { workQueue } : {}),
     processEngine:
       db !== undefined && spine !== undefined && workQueue !== undefined && humanGate !== undefined
@@ -140,7 +167,7 @@ export async function boot(): Promise<void> {
           agentExecutor: createUnconfiguredAgentExecutor(),
           toolBroker: createToolBroker(),
         }),
-    delivery: createDelivery(),
+    delivery,
     skillRegistry: createSkillRegistry(),
     artifactEngine: createArtifactEngine(),
     sorRuntime: createSorRuntime(),
@@ -175,6 +202,39 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
     );
   }
 
+  // P6-deliver: card + reply consumers ride the spine wherever the dispatcher
+  // runs; the Socket Mode client is the inbound Slack transport when an
+  // app-level token is configured (honest degrade to the HTTP ingress otherwise).
+  const deliveryReal =
+    db !== undefined && spine !== undefined && connectivity !== undefined && humanGate !== undefined;
+  if (deliveryReal) {
+    attachDeliverySubscriptions(spine!, delivery);
+  }
+  let socketMode: ReturnType<typeof createSocketModeClient> | undefined;
+  if (deliveryReal && config.slackAppToken !== undefined) {
+    const registry = connectivity!.connectionRegistry;
+    socketMode = createSocketModeClient({
+      appToken: config.slackAppToken,
+      onEvent: async (event) => {
+        const slackConnections = await registry.findByConnector("slack");
+        if (slackConnections.length !== 1) {
+          console.error(
+            `slack socket mode: expected exactly 1 slack connection to route inbound events, ` +
+              `found ${slackConnections.length} — per-workspace routing lands with multi-tenant auth`,
+          );
+          return;
+        }
+        await delivery.ingestSlackEvent(slackConnections[0]!, event);
+      },
+    });
+    void socketMode.start();
+    console.log("slack socket mode: client starting (SLACK_APP_TOKEN set)");
+  } else if (deliveryReal) {
+    console.log(
+      "slack socket mode: disabled (SLACK_APP_TOKEN unset) — inbound slack events only via POST /api/delivery/slack/events",
+    );
+  }
+
   if ((config.role === "orchestrator" || config.role === "all") && spine !== undefined) {
     spine.startDispatcher();
     clock?.start();
@@ -188,6 +248,13 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
 ...(services.humanGate !== undefined ? { humanGate: services.humanGate } : {}),
       ...(services.workQueue !== undefined ? { workQueue: services.workQueue } : {}),
       contextStore: services.contextStore,
+      ...(deliveryReal
+        ? {
+            delivery,
+            slackConnectionFor: async (tenantId: string) =>
+              (await connectivity!.connectionRegistry.findByConnector("slack", tenantId))[0],
+          }
+        : {}),
     });
     server = Bun.serve({ port: config.port, fetch: app.fetch });
     console.log(`api listening on http://localhost:${config.port} — GET /health, GET /stubs`);
@@ -198,6 +265,7 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   const shutdown = async (): Promise<void> => {
     console.log("shutting down…");
     clock?.stop();
+    await socketMode?.stop();
     await spine?.stopDispatcher();
     server?.stop();
     await db?.close();

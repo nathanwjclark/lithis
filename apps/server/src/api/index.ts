@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { NotImplementedError, StubRegistry } from "@lithis/stubkit";
 import type { ApiDeps } from "./deps";
 import { mountContextRoutes } from "./routes/context";
+import { mountDeliveryRoutes } from "./routes/delivery";
 import { mountHumangateRoutes } from "./routes/humangate";
 import { mountWorkRoutes } from "./routes/work";
 
@@ -49,6 +50,7 @@ export function buildApp(deps: ApiDeps): Hono {
   mountHumangateRoutes(app, deps);
   mountWorkRoutes(app, deps);
   mountContextRoutes(app, deps);
+  mountDeliveryRoutes(app, deps);
 
   return app;
 }

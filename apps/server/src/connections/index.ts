@@ -45,6 +45,13 @@ export type NewConnection = Omit<
 export interface ConnectionRegistry {
   register(input: NewConnection): Promise<Connection>;
   list(p: PrincipalContext): Promise<Connection[]>;
+  /**
+   * Server-internal lookup of the live connections for one connector slug —
+   * tenant-scoped when tenantId is given, fleet-wide otherwise (e.g. the
+   * Socket Mode wiring resolving which connection inbound Slack events belong
+   * to). Excludes disabled connections.
+   */
+  findByConnector(connectorSlug: string, tenantId?: Ulid): Promise<Connection[]>;
   /** Probe + persist health; emits connection.health.changed on transitions. */
   health(connectionId: Ulid): Promise<Connection["health"]>;
   /** Feed arrival heartbeat — resets the FeedExpectation grace window. */

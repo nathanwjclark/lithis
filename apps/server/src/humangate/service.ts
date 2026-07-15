@@ -146,6 +146,14 @@ export function createPgHumanGate(db: Db, spine: EventSpine): HumanGate {
       return request;
     },
 
+    async get(id: Ulid, tenantId: Ulid): Promise<HumanRequest | undefined> {
+      const rows: HumanRequestRow[] = await db.sql`
+        select * from humangate.human_requests
+        where id = ${id} and tenant_id = ${tenantId}`;
+      const row = rows[0];
+      return row === undefined ? undefined : rowToHumanRequest(row);
+    },
+
     async resolve(id: Ulid, res: HumanResolution, by: PrincipalContext): Promise<HumanRequest> {
       const resolution = humanResolutionSchema.parse(res);
       return await db.withTx(async (tx) => {

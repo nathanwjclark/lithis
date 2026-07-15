@@ -87,6 +87,22 @@ export function createPgConnectionRegistry(
       return rows.map(rowToConnection);
     },
 
+    async findByConnector(connectorSlug: string, tenantId?: Ulid): Promise<Connection[]> {
+      const rows: ConnectionRow[] =
+        tenantId !== undefined
+          ? await db.sql`
+              select * from connections.connections
+              where connector_slug = ${connectorSlug}
+                and tenant_id = ${tenantId}
+                and status <> 'disabled'
+              order by created_at, id`
+          : await db.sql`
+              select * from connections.connections
+              where connector_slug = ${connectorSlug} and status <> 'disabled'
+              order by created_at, id`;
+      return rows.map(rowToConnection);
+    },
+
     async health(connectionId: Ulid): Promise<Connection["health"]> {
       const connection = await loadConnection(db, connectionId);
       // Disabled is an operator decision, not a probe result — never probe it back to life.
