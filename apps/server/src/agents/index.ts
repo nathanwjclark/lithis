@@ -11,6 +11,7 @@ import type { Db } from "../db";
 import type { EventSpine, TickSource } from "../spine";
 import type { ServerConfig } from "../config";
 import type { IdentityService } from "../iam";
+import type { SkillToolExecutor } from "../skills";
 import type { WorkQueue } from "../work";
 import type { ContextStore } from "../context";
 import { createAnthropicComplete, createRunExecutor, DEFAULT_AGENT_MODEL } from "./executor";
@@ -117,6 +118,8 @@ export interface AgentsRuntimeDeps {
   complete?: CompleteFn;
   /** Extra broker-issued tools with server-side handlers (sentinel raise_finding, ...). */
   extraTools?: BrokeredTool[];
+  /** Executes broker-issued skill-manifest tools (P10-skills). */
+  skills?: SkillToolExecutor;
   config: Pick<ServerConfig, "anthropicApiKey" | "agentModel">;
   /** Lease heartbeat cadence while a run is in flight (default 60s). */
   leaseHeartbeatMs?: number;
@@ -149,6 +152,7 @@ export function createAgentsRuntime(deps: AgentsRuntimeDeps): AgentsRuntime {
     toolBroker,
     workQueue: deps.workQueue,
     transcripts,
+    ...(deps.skills !== undefined ? { skills: deps.skills } : {}),
     model,
     ...(deps.extraTools !== undefined ? { extraTools: deps.extraTools } : {}),
   });

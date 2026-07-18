@@ -41,7 +41,11 @@ interface Harness {
 
 function harness(
   turns: ModelTurn[],
-  opts: { complete?: CompleteFn; extraTools?: import("../src/agents").BrokeredTool[] } = {},
+  opts: {
+    complete?: CompleteFn;
+    extraTools?: import("../src/agents").BrokeredTool[];
+    skills?: import("../src/skills").SkillToolExecutor;
+  } = {},
 ): Harness {
   const events: Harness["events"] = [];
   const notes: Harness["notes"] = [];
@@ -86,6 +90,7 @@ function harness(
     toolBroker: createCharterToolBroker(opts.extraTools?.map((t) => t.def)),
     workQueue,
     transcripts: transcriptStore,
+    ...(opts.skills !== undefined ? { skills: opts.skills } : {}),
     model: "claude-sonnet-5",
     ...(opts.extraTools !== undefined ? { extraTools: opts.extraTools } : {}),
   });
@@ -191,7 +196,7 @@ describe("run executor", () => {
     expect(h.calls()).toBe(2);
   });
 
-  test("unknown (skill) tool fails loudly through the stub but the run can recover", async () => {
+  test("unknown tool without a skills executor fails loudly but the run can recover", async () => {
     const h = harness([
       turn([toolUse("skill_quote_generator", { account: "acme" })]),
       turn([toolUse("report_blocker", { blocker: "skill tooling unavailable" })]),
@@ -200,9 +205,35 @@ describe("run executor", () => {
     expect(outcome.status).toBe("blocked");
     const skillEvent = h.events[0]!.payload as { tool: string; isError: boolean };
     expect(skillEvent).toEqual({ tool: "skill_quote_generator", isError: true });
-    // The model saw the loud stub reason as an is_error tool result.
+    // The model saw an honest is_error tool result naming the gap.
     const transcript = JSON.stringify(h.transcripts[0]);
-    expect(transcript).toContain("LITHIS-STUB");
+    expect(transcript).toContain("not a base tool or a registered skill tool");
+  });
+
+  test("a skill tool dispatches through the skills executor; unknown names still fall through", async () => {
+    const executed: { toolName: string; input: unknown; tenantId?: string }[] = [];
+    const h = harness(
+      [
+        turn([toolUse("skill_quote_generator", { account: "acme" })]),
+        turn([toolUse("skill_unknown_thing", {})]),
+        turn([toolUse("record_result", { summary: "quoted acme" })]),
+      ],
+      {
+        skills: {
+          tryExecuteTool: async (p, toolName, input) => {
+            if (toolName !== "skill_quote_generator") return undefined;
+            executed.push({ toolName, input, tenantId: p.tenantId });
+            return { result: JSON.stringify({ quoted: true }), isError: false };
+          },
+        },
+      },
+    );
+    const outcome = await h.execute();
+    expect(outcome.status).toBe("done");
+    expect(executed).toHaveLength(1);
+    expect(executed[0]!.input).toEqual({ account: "acme" });
+    expect(h.events[0]!.payload).toEqual({ tool: "skill_quote_generator", isError: false });
+    expect(h.events[1]!.payload).toEqual({ tool: "skill_unknown_thing", isError: true });
   });
 
   test("extra brokered tools dispatch before the skill fall-through; a throw is an is_error result", async () => {

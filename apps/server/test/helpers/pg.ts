@@ -92,6 +92,9 @@ export async function truncateAll(db: Db): Promise<void> {
       agents.runs,
       agents.run_results,
       agents.evidence,
-      delivery.deliveries
+      delivery.deliveries,
+      skills.skills,
+      skills.skill_versions,
+      skills.skill_runs
     cascade`;
 }

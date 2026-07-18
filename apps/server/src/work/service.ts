@@ -519,6 +519,52 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
       });
     },
 
+    // ── P10-skills read/advance surface ──────────────────────────────────
+
+    async listRecent(
+      tenantId: Ulid,
+      opts: { since: string; limit?: number },
+    ): Promise<WorkItem[]> {
+      const limit = opts.limit ?? 100;
+      const rows: WorkItemRow[] = await db.sql`
+        select * from work.work_items
+        where tenant_id = ${tenantId} and updated_at >= ${opts.since}::timestamptz
+        order by updated_at desc, id desc
+        limit ${limit}`;
+      return rows.map(rowToWorkItem);
+    },
+
+    async dueFollowUps(tenantId: Ulid, now: string): Promise<WorkItem[]> {
+      const rows: WorkItemRow[] = await db.sql`
+        select * from work.work_items
+        where tenant_id = ${tenantId}
+          and follow_up is not null
+          and (follow_up ->> 'nextAt')::timestamptz <= ${now}::timestamptz
+          and status not in ('done', 'cancelled')
+        order by id`;
+      return rows.map(rowToWorkItem);
+    },
+
+    async recordFollowUpContact(
+      id: WorkItemId,
+      lastContactAt: string,
+      nextAt: string,
+    ): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "recordFollowUpContact");
+        const followUp = fromJsonb(row.follow_up);
+        if (followUp === null || followUp === undefined) {
+          throw new Error(`recordFollowUpContact: work item ${id} has no followUp`);
+        }
+        const next = { ...(followUp as Record<string, unknown>), lastContactAt, nextAt };
+        await txSql(tx)`
+          update work.work_items
+          set follow_up = ${JSON.stringify(next)}::text::jsonb,
+              revision = revision + 1, updated_at = ${nowIso()}
+          where id = ${id}`;
+      });
+    },
+
     async addNote(id: WorkItemId, n: NewWorkNote): Promise<void> {
       await db.withTx(async (tx) => {
         const rows: { tenant_id: string }[] = await txSql(tx)`

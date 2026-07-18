@@ -1,4 +1,5 @@
 import type {
+  IsoDateTime,
   PrincipalContext,
   Ref,
   RunOutcome,
@@ -101,6 +102,21 @@ export interface WorkQueue {
   revokeLease(id: WorkItemId, actor: Ref): Promise<void>;
   /** Any live status → cancelled (lease cleared). */
   cancel(id: WorkItemId, actor: Ref): Promise<void>;
+
+  // ── P10-skills read/advance surface (weekly-report + follow-up-cadence) ──
+  /** Items updated since `since`, newest first (reporting windows). */
+  listRecent(
+    tenantId: Ulid,
+    opts: { since: IsoDateTime; limit?: number },
+  ): Promise<WorkItem[]>;
+  /** Open items whose followUp.nextAt is due at `now` (done/cancelled excluded). */
+  dueFollowUps(tenantId: Ulid, now: IsoDateTime): Promise<WorkItem[]>;
+  /** After a follow-up send: stamp followUp.lastContactAt + the next cadence wake. */
+  recordFollowUpContact(
+    id: WorkItemId,
+    lastContactAt: IsoDateTime,
+    nextAt: IsoDateTime,
+  ): Promise<void>;
 }
 
 export interface WorkQueueOptions {

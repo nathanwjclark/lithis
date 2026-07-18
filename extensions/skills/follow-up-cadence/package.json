@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@lithis/core": "workspace:*",
-    "@lithis/stubkit": "workspace:*"
+    "@lithis/stubkit": "workspace:*",
+    "@lithis/sdk": "workspace:*"
   }
 }

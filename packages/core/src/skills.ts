@@ -28,6 +28,7 @@ export const gitRefSchema = z.object({
   ref: z.string().min(1),
   path: z.string().min(1),
 });
+export type GitRef = z.infer<typeof gitRefSchema>;
 
 export const skillManifestSchema = z.object({
   description: z.string().min(1),

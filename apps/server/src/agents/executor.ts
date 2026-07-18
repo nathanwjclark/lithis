@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NotImplementedError, stub } from "@lithis/stubkit";
 import type { Cost, PrincipalContext, RunBrief } from "@lithis/core";
 import type { Db } from "../db";
 import type { EventSpine } from "../spine";
+import type { SkillToolExecutor } from "../skills";
 import type { WorkQueue } from "../work";
 import { ADD_WORK_NOTE_TOOL, RECORD_RESULT_TOOL, REPORT_BLOCKER_TOOL } from "./toolbroker";
 import { ZERO_COST, addCost, sha256Hex } from "./store";
@@ -111,18 +111,6 @@ The brief below is your full context. Work the item using your tools, then you M
 
 Use add_work_note for durable progress notes worth a human reading later. Do not fabricate results: if you cannot actually complete the work with the tools available, report a blocker instead.`;
 
-// ── skill tools (issued by the broker, not yet executable) ──────────────────
-
-/**
- * Skill-manifest tools are on the surface (toolbroker.ts) but executing them
- * lands with P10-skills. Calls fail loudly through this stub; the model sees
- * the stub reason as an is_error tool result and can report a blocker.
- */
-const executeSkillTool = stub<(tool: string, input: unknown) => Promise<string>>(
-  "server.agents.executor.skilltool",
-  "LITHIS-STUB: skill-manifest tool execution not implemented (P10-skills); base tools only",
-);
-
 // ── the executor ────────────────────────────────────────────────────────────
 
 export interface RunExecutorDeps {
@@ -132,6 +120,8 @@ export interface RunExecutorDeps {
   toolBroker: ToolBroker;
   workQueue: WorkQueue;
   transcripts: TranscriptStore;
+  /** Executes broker-issued skill-manifest tools (P10-skills); absent in DB-less rigs. */
+  skills?: SkillToolExecutor;
   model: string;
   /** Extra broker-issued tools (defs already on the broker surface) with server-side handlers. */
   extraTools?: BrokeredTool[];
@@ -226,8 +216,10 @@ export function createRunExecutor(deps: RunExecutorDeps): AgentExecutor {
         return { result: "note added", isError: false };
       }
       default: {
-        // Extra broker-issued tools (sentinel raise_finding, ...) dispatch
-        // first; a throw surfaces as an is_error result the model can react to.
+        // Canonical dispatch order: extra broker-issued tools (sentinel
+        // raise_finding, ...) first — a throw surfaces as an is_error result
+        // the model can react to — then the skill-tool executor, then the
+        // unknown-tool error.
         const extra = extraTools.get(name);
         if (extra !== undefined) {
           try {
@@ -239,14 +231,18 @@ export function createRunExecutor(deps: RunExecutorDeps): AgentExecutor {
             };
           }
         }
-        try {
-          return { result: await executeSkillTool(name, input), isError: false };
-        } catch (err) {
-          if (err instanceof NotImplementedError) {
-            return { result: `tool '${name}' is not executable: ${err.reason}`, isError: true };
-          }
-          throw err;
+        if (deps.skills !== undefined) {
+          const viaSkill = await deps.skills.tryExecuteTool(
+            { tenantId: brief.tenantId, principalId: brief.principalId, kind: "agent" },
+            name,
+            input,
+          );
+          if (viaSkill !== undefined) return viaSkill;
         }
+        return {
+          result: `tool '${name}' is not available: not a base tool or a registered skill tool`,
+          isError: true,
+        };
       }
     }
   }

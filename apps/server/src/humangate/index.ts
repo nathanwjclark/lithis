@@ -49,6 +49,13 @@ export interface HumanGate {
   resolve(id: Ulid, res: HumanResolution, by: PrincipalContext): Promise<HumanRequest>;
   inbox(p: PrincipalContext, f?: InboxFilter): Promise<HumanRequest[]>;
   /**
+   * TENANT-WIDE pending read (P10-skills: the weekly digest's approvals
+   * section). inbox() deliberately hides Ref-assigned requests from other
+   * principals, so a digest compiled by a skill principal would under-count —
+   * this read skips the assignee visibility filter, pending state only.
+   */
+  listPending(tenantId: Ulid, f?: Pick<InboxFilter, "kinds" | "subjectKinds">): Promise<HumanRequest[]>;
+  /**
    * The Invalidator's move (P8-process): every pending/approved/modified
    * request about `subject` flips to `superseded` (original approvers are
    * notified via humangate.superseded). Returns the superseded request ids.

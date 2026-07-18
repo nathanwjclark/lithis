@@ -67,4 +67,4 @@ export function createIdentityService(db: Db, spine: EventSpine): IdentityServic
   return createPgIdentityService(db, spine);
 }
 
-export { ensureDevSeed } from "./seed";
+export { ensureDevSeed, findDevSeed } from "./seed";
