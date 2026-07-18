@@ -2,6 +2,8 @@
 -- tick, agent tool call, manual invoke) lands a row, succeeded or failed,
 -- never silent. Result/error are the run's honest outcome payload.
 
+create schema if not exists skills;
+
 create table if not exists skills.skill_runs (
   id          text primary key,
   tenant_id   text not null,

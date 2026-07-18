@@ -165,7 +165,7 @@ describe("follow-up-cadence run", () => {
     await expect(run({}, { tenantId: TENANT, now: NOW })).rejects.toThrow(/work surface/);
   });
 
-  test("the email nudge path is a loud registered stub (needs C-google/C-ms365)", () => {
+  test("the email nudge path fails loudly until C-google/C-ms365 land", () => {
     expect(() => sendEmailNudge(newUlid(), "hello")).toThrow(NotImplementedError);
   });
 });

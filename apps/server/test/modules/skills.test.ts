@@ -6,7 +6,7 @@ import { createUnconfiguredSkillRegistry, runEvalGate } from "../../src/skills";
  * P10-skills replaced the registry stub with the real service (covered by
  * test/skills.runtime.test.ts, test/skills.tick.test.ts and
  * test/integration/skills.pg.test.ts). What remains here: the DB-less config
- * degrade and the one deliberately-registered stub (the P16 eval gate).
+ * degrade and the deliberately-registered P16 eval-gate stub.
  */
 
 describe("skills module surface", () => {
