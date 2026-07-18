@@ -76,6 +76,17 @@ export interface ToolSet {
 }
 
 /**
+ * An extra broker-issued tool with a server-side handler (e.g. sentinel's
+ * raise_finding). The def joins every agent's surface via the broker; the
+ * executor dispatches matching calls to execute() before the skill-tool path.
+ */
+export interface BrokeredTool {
+  def: ToolDef;
+  /** Returns the tool_result text; throwing surfaces as an is_error tool result. */
+  execute(brief: RunBrief, input: unknown): Promise<string>;
+}
+
+/**
  * THE scope choke point: charter + skill manifests decide the tool surface
  * (grant intersection deferred with the policy layer); every tool call emits
  * a spine event (agent.tool_called, appended by the executor per dispatch).
@@ -104,6 +115,8 @@ export interface AgentsRuntimeDeps {
   contextStore: ContextStore;
   /** Injectable LLM seam — tests script it; production uses the Anthropic SDK. */
   complete?: CompleteFn;
+  /** Extra broker-issued tools with server-side handlers (sentinel raise_finding, ...). */
+  extraTools?: BrokeredTool[];
   config: Pick<ServerConfig, "anthropicApiKey" | "agentModel">;
   /** Lease heartbeat cadence while a run is in flight (default 60s). */
   leaseHeartbeatMs?: number;
@@ -127,7 +140,7 @@ export function createAgentsRuntime(deps: AgentsRuntimeDeps): AgentsRuntime {
     (deps.config.anthropicApiKey !== undefined
       ? createAnthropicComplete(deps.config.anthropicApiKey)
       : failUnconfiguredComplete);
-  const toolBroker = createCharterToolBroker();
+  const toolBroker = createCharterToolBroker(deps.extraTools?.map((t) => t.def));
   const transcripts: TranscriptStore = transcriptStoreFromContext(deps.contextStore);
   const executor = createRunExecutor({
     db: deps.db,
@@ -137,6 +150,7 @@ export function createAgentsRuntime(deps: AgentsRuntimeDeps): AgentsRuntime {
     workQueue: deps.workQueue,
     transcripts,
     model,
+    ...(deps.extraTools !== undefined ? { extraTools: deps.extraTools } : {}),
   });
   const { host, heartbeatTickSource } = createResidentAgentHost({
     db: deps.db,

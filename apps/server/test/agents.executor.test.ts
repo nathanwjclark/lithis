@@ -39,7 +39,10 @@ interface Harness {
   calls: () => number;
 }
 
-function harness(turns: ModelTurn[], opts: { complete?: CompleteFn } = {}): Harness {
+function harness(
+  turns: ModelTurn[],
+  opts: { complete?: CompleteFn; extraTools?: import("../src/agents").BrokeredTool[] } = {},
+): Harness {
   const events: Harness["events"] = [];
   const notes: Harness["notes"] = [];
   const transcripts: unknown[] = [];
@@ -80,10 +83,11 @@ function harness(turns: ModelTurn[], opts: { complete?: CompleteFn } = {}): Harn
       if (opts.complete !== undefined) calls++;
       return complete(req, signal);
     },
-    toolBroker: createCharterToolBroker(),
+    toolBroker: createCharterToolBroker(opts.extraTools?.map((t) => t.def)),
     workQueue,
     transcripts: transcriptStore,
     model: "claude-sonnet-5",
+    ...(opts.extraTools !== undefined ? { extraTools: opts.extraTools } : {}),
   });
 
   const tenantId = newUlid();
@@ -199,6 +203,43 @@ describe("run executor", () => {
     // The model saw the loud stub reason as an is_error tool result.
     const transcript = JSON.stringify(h.transcripts[0]);
     expect(transcript).toContain("LITHIS-STUB");
+  });
+
+  test("extra brokered tools dispatch before the skill fall-through; a throw is an is_error result", async () => {
+    const seen: unknown[] = [];
+    const extra: import("../src/agents").BrokeredTool = {
+      def: {
+        name: "raise_finding",
+        description: "raise a finding",
+        inputSchema: { type: "object" },
+      },
+      execute: async (_brief, input) => {
+        seen.push(input);
+        if ((input as { boom?: boolean }).boom === true) throw new Error("citation missing");
+        return "finding raised: hr_1";
+      },
+    };
+    const h = harness(
+      [
+        turn([toolUse("raise_finding", { boom: true })]),
+        turn([toolUse("raise_finding", { severity: "warning" })]),
+        turn([toolUse("record_result", { summary: "raised" })]),
+      ],
+      { extraTools: [extra] },
+    );
+    const outcome = await h.execute();
+    expect(outcome.status).toBe("done");
+    expect(seen).toEqual([{ boom: true }, { severity: "warning" }]);
+    expect(
+      h.events.map((e) => e.payload as { tool: string; isError: boolean }),
+    ).toEqual([
+      { tool: "raise_finding", isError: true }, // the throw surfaced honestly
+      { tool: "raise_finding", isError: false },
+      { tool: "record_result", isError: false },
+    ]);
+    const transcript = JSON.stringify(h.transcripts[0]);
+    expect(transcript).toContain("citation missing");
+    expect(transcript).toContain("finding raised: hr_1");
   });
 
   test("model call failure (e.g. missing ANTHROPIC_API_KEY) → failed with a clear blocker", async () => {

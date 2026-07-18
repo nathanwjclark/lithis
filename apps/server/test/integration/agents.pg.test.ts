@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import { newUlid, nowIso } from "@lithis/core";
+import { newUlid } from "@lithis/core";
 import type { AgentCharter } from "@lithis/core";
 import { createAgentsRuntime } from "../../src/agents";
 import type { AgentsRuntime } from "../../src/agents";
@@ -78,8 +78,7 @@ describePg("agents resident loop (integration)", () => {
       displayName: "Resident Agent",
       status: "active",
     });
-    const at = nowIso();
-    const charter: AgentCharter = {
+    await identity.createCharter({
       principalId: principal.id,
       tenantId: tenant.id,
       role: "You work the tenant's queue and report honestly.",
@@ -88,19 +87,7 @@ describePg("agents resident loop (integration)", () => {
       modelPolicy: { plan: "claude-sonnet-5", execute: "claude-sonnet-5", index: "claude-haiku-4-5" },
       budgets: input.budgets ?? { usdPerRun: 1, usdPerDay: 10 },
       wake: input.wake ?? { onMessages: false },
-      createdAt: at,
-      updatedAt: at,
-    };
-    // Fixture seed: iam owns this table; there is no charter-create API yet.
-    await db.sql`
-      insert into iam.agent_charters
-        (principal_id, tenant_id, role, prompt_ref, memory_blob_id, model_policy, budgets, wake)
-      values
-        (${charter.principalId}, ${charter.tenantId}, ${charter.role},
-         ${JSON.stringify(charter.promptRef)}::text::jsonb, ${charter.memoryBlobId},
-         ${JSON.stringify(charter.modelPolicy)}::text::jsonb,
-         ${JSON.stringify(charter.budgets)}::text::jsonb,
-         ${JSON.stringify(charter.wake)}::text::jsonb)`;
+    });
 
     const runtime = createAgentsRuntime({
       db,

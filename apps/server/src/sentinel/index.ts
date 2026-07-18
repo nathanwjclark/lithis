@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { cronSchema, slugSchema } from "@lithis/core";
 import type { Principal, Ulid } from "@lithis/core";
-import { stubService } from "@lithis/stubkit";
 
 /**
  * sentinel — default watcher AGENTS, not framework schemas. Compliance,
@@ -24,6 +23,10 @@ export const watcherCharterConfigSchema = z.object({
     onEvents: z.array(z.string()).optional(),
     onMessages: z.boolean(),
   }),
+  /** Charter budgets; DEFAULT_WATCHER_BUDGETS (service.ts) when omitted. */
+  budgets: z
+    .object({ usdPerRun: z.number().positive(), usdPerDay: z.number().positive() })
+    .optional(),
 });
 export type WatcherCharterConfig = z.infer<typeof watcherCharterConfigSchema>;
 
@@ -115,12 +118,30 @@ export interface WatcherHost {
   ensureDefaults(tenantId: Ulid): Promise<void>;
 }
 
-const watcherHost = stubService<WatcherHost>(
-  "server.sentinel.watcherhost",
-  ["list", "ensureDefaults"],
-  "LITHIS-STUB: minting default watcher principals/charters per tenant not implemented",
-);
+export { createWatcherHost, DEFAULT_WATCHER_BUDGETS } from "./service";
+export type { WatcherHostDeps } from "./service";
+export { attachSentinel } from "./bridge";
+export type { AttachedSentinel, SentinelBridgeDeps } from "./bridge";
+export {
+  createRaiseFindingTool,
+  findingCitationSchema,
+  refFromString,
+  watcherFindingPayloadSchema,
+  FINDING_SEVERITIES,
+  RAISE_FINDING_TOOL,
+} from "./findings";
+export type { RaiseFindingDeps, WatcherFindingPayload } from "./findings";
 
-export function createWatcherHost(): WatcherHost {
-  return watcherHost;
+/**
+ * DB-less skeleton mode (DATABASE_URL unset): watchers cannot be minted. This
+ * is honest CONFIG degrade, not a stub — the real implementation (service.ts)
+ * is wired whenever a database is configured.
+ */
+export function createUnconfiguredWatcherHost(): WatcherHost {
+  const fail = (): never => {
+    throw new Error(
+      "watcher host unavailable: DATABASE_URL is not set — the server is running in DB-less skeleton mode",
+    );
+  };
+  return { list: fail, ensureDefaults: fail };
 }

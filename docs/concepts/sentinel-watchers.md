@@ -52,5 +52,6 @@ The skeleton ships charter/config data for four default watchers:
 | security | custody issuance, browser actions, workspace events | credential use outside expected scope |
 | data-quality | ingest + distill events | feeds landing malformed, entity attrs drifting from SchemaPack |
 
-Their configs are authored data in `extensions/packs/*`; the engines that run
-them (AgentHost, executor) are the same ones every agent uses.
+The default configs are authored data in `apps/server/src/sentinel` (packs in
+`extensions/packs/*` ship domain-specific ones); the engines that run them
+(AgentHost, executor) are the same ones every agent uses.

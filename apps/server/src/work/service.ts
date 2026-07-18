@@ -198,6 +198,38 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
     await emitStatusChanged(tx, row, from, to, row.attempt, actor);
   }
 
+  /** Append a journal note + its work.note.added event inside the caller's tx. */
+  async function insertNote(
+    tx: DbTx,
+    workItemId: WorkItemId,
+    tenantId: string,
+    n: NewWorkNote,
+  ): Promise<void> {
+    const at = nowIso();
+    const note = workNoteSchema.parse({
+      id: newUlid(),
+      tenantId,
+      workItemId,
+      at,
+      byRef: n.byRef,
+      kind: n.kind,
+      text: n.text,
+    });
+    await txSql(tx)`
+      insert into work.work_notes
+        (id, tenant_id, work_item_id, at, by_ref, kind, text, created_at, updated_at)
+      values
+        (${note.id}, ${note.tenantId}, ${note.workItemId}, ${note.at},
+         ${note.byRef}::jsonb, ${note.kind}, ${note.text}, ${at}, ${at})`;
+    await spine.append(tx, {
+      tenantId: note.tenantId,
+      topic: "work.note.added",
+      subjectRefs: [{ kind: "work_item", id: workItemId }],
+      actor: note.byRef,
+      payload: { noteKind: note.kind },
+    });
+  }
+
   /**
    * After an item reached `done`: dependents sitting pending/stale whose
    * depends_on upstreams are now ALL done flip to ready (same transaction).
@@ -292,7 +324,7 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
             and (${kindsCsv === null} or kind = any(string_to_array(${kindsCsv}::text, ',')))
             and (${f.processRunId === undefined} or process_run_id = ${f.processRunId ?? null})
             and (${f.ownedOnly !== true} or owner_principal_id = ${p.principalId})
-          order by priority desc, id
+          order by (owner_principal_id = ${p.principalId}) desc, priority desc, id
           limit 1
           for update skip locked`;
         const row = rows[0];
@@ -467,38 +499,35 @@ export function createPgWorkQueue(db: Db, spine: EventSpine, opts?: WorkQueueOpt
       });
     },
 
+    async reassign(id: WorkItemId, newOwnerPrincipalId: Ulid, actor: Ref): Promise<void> {
+      await db.withTx(async (tx) => {
+        const row = await lockItem(tx, id, "reassign");
+        if (row.owner_principal_id === newOwnerPrincipalId) return;
+        const at = nowIso();
+        await txSql(tx)`
+          update work.work_items
+          set owner_principal_id = ${newOwnerPrincipalId},
+              revision = revision + 1, updated_at = ${at}
+          where id = ${id}`;
+        // The change is journaled, not gated: any principal may reassign (a
+        // wrong change is on the changer — the Jira-assignee model).
+        await insertNote(tx, id, row.tenant_id, {
+          byRef: actor,
+          kind: "system",
+          text: `owner reassigned: ${row.owner_principal_id} → ${newOwnerPrincipalId}`,
+        });
+      });
+    },
+
     async addNote(id: WorkItemId, n: NewWorkNote): Promise<void> {
       await db.withTx(async (tx) => {
-        const sql = txSql(tx);
-        const rows: { tenant_id: string }[] = await sql`
+        const rows: { tenant_id: string }[] = await txSql(tx)`
           select tenant_id from work.work_items where id = ${id}`;
         const item = rows[0];
         if (item === undefined) {
           throw new Error(`addNote: work item ${id} does not exist`);
         }
-        const at = nowIso();
-        const note = workNoteSchema.parse({
-          id: newUlid(),
-          tenantId: item.tenant_id,
-          workItemId: id,
-          at,
-          byRef: n.byRef,
-          kind: n.kind,
-          text: n.text,
-        });
-        await sql`
-          insert into work.work_notes
-            (id, tenant_id, work_item_id, at, by_ref, kind, text, created_at, updated_at)
-          values
-            (${note.id}, ${note.tenantId}, ${note.workItemId}, ${note.at},
-             ${note.byRef}::jsonb, ${note.kind}, ${note.text}, ${at}, ${at})`;
-        await spine.append(tx, {
-          tenantId: note.tenantId,
-          topic: "work.note.added",
-          subjectRefs: [{ kind: "work_item", id }],
-          actor: note.byRef,
-          payload: { noteKind: note.kind },
-        });
+        await insertNote(tx, id, item.tenant_id, n);
       });
     },
   };

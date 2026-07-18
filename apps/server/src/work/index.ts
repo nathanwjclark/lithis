@@ -67,7 +67,7 @@ export interface WorkQueue {
   get(id: WorkItemId): Promise<WorkItem | undefined>;
   /** Every process_node item of a run plus the edges among them. */
   graphForProcessRun(tenantId: Ulid, processRunId: Ulid): Promise<WorkGraph>;
-  /** SKIP LOCKED claim; null when nothing is ready. */
+  /** SKIP LOCKED claim (owner-matched items first, then priority); null when nothing is ready. */
   claim(p: PrincipalContext, f: ClaimFilter): Promise<Lease | null>;
   heartbeat(l: Lease): Promise<void>;
   release(l: Lease): Promise<void>;
@@ -81,6 +81,13 @@ export interface WorkQueue {
   resolveApproval(id: WorkItemId, actor: Ref): Promise<void>;
   /** Append-only journal; emits work.note.added. */
   addNote(id: WorkItemId, n: NewWorkNote): Promise<void>;
+  /**
+   * Change the owner (the Jira-assignee model: any actor may reassign; a wrong
+   * change is on the changer — journaled as a system WorkNote). Ownership is a
+   * soft claim preference, never an exclusion: claim() orders owner-matched
+   * items first but any agent can still pick the item up.
+   */
+  reassign(id: WorkItemId, newOwnerPrincipalId: Ulid, actor: Ref): Promise<void>;
 
   // ── The Invalidator surface (P8-process). The Invalidator (processes module)
   //    is the ONLY writer of `stale` — nothing else should call markStale. ──

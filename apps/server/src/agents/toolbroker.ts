@@ -77,10 +77,12 @@ export function skillToolName(description: string): string {
   return `skill_${slug.length > 0 ? slug : "tool"}`;
 }
 
-export function createCharterToolBroker(): ToolBroker {
+export function createCharterToolBroker(extraDefs: ToolDef[] = []): ToolBroker {
   return {
     toolsFor(_p: PrincipalContext, manifest?: SkillManifest): ToolSet {
-      const tools = [...BASE_TOOLS];
+      // Extra broker-issued defs (sentinel raise_finding, ...) sit between the
+      // base surface and any manifest tool; their handlers live in the executor.
+      const tools = [...BASE_TOOLS, ...extraDefs];
       if (manifest !== undefined) {
         tools.push({
           name: skillToolName(manifest.description),
