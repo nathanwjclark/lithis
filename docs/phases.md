@@ -25,10 +25,10 @@ Statuses: `todo` · `in progress` · `in review (PR #)` · `done (PR #)`
 | **P7-agents** | done (PR #13) | `server.agents.{host,executor,toolbroker}.*` — resident loop, briefs, transcripts, cost, budget abort · *port: cass/openclaw wake taxonomy + loop discipline* | P1, P5 (soft: P2, P4) | ANTHROPIC_API_KEY; dep-chore PR: `@anthropic-ai/sdk` | seeded resident agent autonomously works 3 items; budget abort mid-run |
 | **P8-process** | done (PR #14) | `server.processes.engine.*` — nodes as WorkItems, WatchRules, Invalidator, cascades; wire the 3-node underwriting template · *port: trellis invalidation semantics* | P1, P5 (soft: P2, P4, P7) | — | new-doc cascade + deny cascade run live |
 | **P9-portal** | done (PR #12) | Portal screens over real routes (Inbox resolve UI first) — `apps/portal/` only; screens degrade to stub cards | P2 (each screen soft-deps its module) | — | approve from the portal end-to-end |
-| **P10-skills** | todo | `server.skills.registry.*` + follow-up-cadence & weekly-report skills | P1, P5, P6 | — | cadence skill fires a Slack nudge on tick; weekly digest renders |
+| **P10-skills** | done (PR #18) | `server.skills.registry.*` + follow-up-cadence & weekly-report skills | P1, P5, P6 | — | cadence skill fires a Slack nudge on tick; weekly digest renders |
 | **P11-artifacts-sor** | todo | `server.artifacts.engine.*`, `server.sor.runtime.*` — template render/verify; AMS provisioning; approval-gated SoR migrations | P1, P4, P2 | — | render+verify an artifact; SoR migration approved + applied |
 | **P12-browser** | todo | `apps/browserhost`, `server.custody.broker.mountSession`, `connector.linkedin.*`, ActionIntent batches, path ranking, linkedin-bd pack · *port: crm scraper selectors + salesnav pathfind* — split infra/pack into 2 PRs | P3, P7, P4 | LinkedIn session | ActionIntent batch executes in a sealed session with receipts; ranked 2nd-degree targets |
-| **P13-sentinel** | todo | `server.sentinel.*` — default watcher charters, conversation watchers, findings routing | P1, P6, P7 | — | concerning message → routed finding card |
+| **P13-sentinel** | done (PR #17) | `server.sentinel.*` — default watcher charters, conversation watchers, findings routing | P1, P6, P7 | — | concerning message → routed finding card |
 | **P14-workbench** | todo | per-tenant containers, PR-only egress | P1 (soft P7) | — | workspace lifecycle events |
 | **P15-gcp** | todo | Cloud Run/SQL/PubSub SpineDriver adapters (`deploy/` only) | a system worth deploying | GCP project | reference deploy runs |
 | **P16-evals** | todo | `evals.replay.harness` — replay over readSince + agent-run replay | P1 (full value: P7) | — | replay a recorded run |
@@ -82,3 +82,20 @@ server phases.
 | crm LinkedIn scraper + salesnav pathfind | P12-browser | selectors as fixture-tested parsers; path-ranking heuristics |
 | cass/openclaw resident agent | P7-agents | wake-reason taxonomy, loop cadence, budget/abort discipline |
 | trellis graph-task patterns | P8-process (+P5) | node keys, dirty-propagation, rerun semantics |
+
+## Follow-ups minted by wave 4a (P10 #18 + P13 #17)
+
+- Agent-facing `reassign` tool (ownership is Jira-assignee-style, changeable by
+  any agent; only the WorkQueue method shipped).
+- Sentinel bridge idempotency under at-least-once redelivery (dedupe watch
+  items by source event id) + batching/filtering for high-volume topics.
+- `iam.charter.created` actor should be the caller, not the chartered principal.
+- Weekly digest default window: Monday-08:00 run covers only the new week's
+  first hours — decide previous-week default vs explicit `weekOf`.
+- Per-counterpart email nudges (`skill.follow-up-cadence.send.email`) need
+  entity→channel resolution + C-google/C-ms365.
+- Relationship read surface for the digest's relationships section.
+- `evidenceIds` on watcher findings (needs mid-run evidence minting).
+- Eval gate wiring (`server.skills.registry.evalgate`, P16-evals).
+- Tenant-scoped connections list overload (invoker fabricates a
+  PrincipalContext today).
