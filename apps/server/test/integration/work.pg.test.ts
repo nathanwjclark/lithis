@@ -338,6 +338,53 @@ describePg("WorkQueue (integration)", () => {
     ).rejects.toThrow(/does not exist/);
   });
 
+  test("claim prefers owner-matched items over higher priority, without excluding cross-claims", async () => {
+    const { queue, tenantId } = await setup();
+    const worker = principal(tenantId);
+    const otherOwner = newUlid();
+    const hot = await queue.open(item(tenantId, { title: "hot", priority: 0.9, ownerPrincipalId: otherOwner }));
+    const mine = await queue.open(
+      item(tenantId, { title: "mine", priority: 0.1, ownerPrincipalId: worker.principalId }),
+    );
+
+    // Soft preference: the low-priority OWNED item wins the first claim…
+    const first = await queue.claim(worker, {});
+    expect(first?.workItemId).toBe(mine);
+    // …but ownership never excludes: the same worker still claims the other item.
+    const second = await queue.claim(worker, {});
+    expect(second?.workItemId).toBe(hot);
+  });
+
+  test("reassign changes the owner, journals a system note, and no-ops on the same owner", async () => {
+    const { db, spine, queue, tenantId } = await setup();
+    const from = newUlid();
+    const to = newUlid();
+    const actor = { kind: "principal", id: newUlid() } as const;
+    const id = await queue.open(item(tenantId, { ownerPrincipalId: from }));
+
+    await queue.reassign(id, to, actor);
+    await queue.reassign(id, to, actor); // same owner → no second note
+
+    const rows: { owner_principal_id: string; revision: number }[] = await db.sql`
+      select owner_principal_id, revision from work.work_items where id = ${id}`;
+    expect(rows[0]!.owner_principal_id).toBe(to);
+    expect(rows[0]!.revision).toBe(1);
+
+    const notes: { kind: string; text: string; by_ref: unknown }[] = await db.sql`
+      select kind, text, by_ref from work.work_notes where work_item_id = ${id}`;
+    expect(notes.length).toBe(1);
+    expect(notes[0]!.kind).toBe("system");
+    expect(notes[0]!.text).toBe(`owner reassigned: ${from} → ${to}`);
+    const byRef =
+      typeof notes[0]!.by_ref === "string" ? JSON.parse(notes[0]!.by_ref) : notes[0]!.by_ref;
+    expect(byRef).toEqual(actor);
+
+    const events = await workEvents(spine, tenantId);
+    expect(events.map((e) => e.topic)).toEqual(["work.item.opened", "work.note.added"]);
+
+    await expect(queue.reassign(newUlid(), to, actor)).rejects.toThrow(/does not exist/);
+  });
+
   test("outbox: open commits the row and its event atomically (rollback proof)", async () => {
     const { db, spine, tenantId } = await setup();
     const failingSpine: EventSpine = {

@@ -22,6 +22,8 @@ import { createPgIdentityService } from "./service";
 
 export type NewTenant = Omit<Tenant, "id" | "createdAt" | "updatedAt">;
 export type NewPrincipal = Omit<Principal, "id" | "createdAt" | "updatedAt">;
+/** Charter keys are the principal's — only the timestamps are service-assigned. */
+export type NewAgentCharter = Omit<AgentCharter, "createdAt" | "updatedAt">;
 
 /**
  * DEFERRED (see TODOS.md): callers do not depend on this yet. The shape lives
@@ -39,8 +41,16 @@ export interface PolicyEngine {
 export interface IdentityService {
   createTenant(input: NewTenant): Promise<Tenant>;
   createPrincipal(input: NewPrincipal): Promise<Principal>;
+  /** Makes a principal a resident agent; emits iam.charter.created. One charter per principal. */
+  createCharter(input: NewAgentCharter): Promise<AgentCharter>;
   /** Null for principals that are not resident agents. */
   getCharter(principalId: Ulid): Promise<AgentCharter | null>;
+  /** Point lookup by id; null when absent. */
+  getPrincipal(principalId: Ulid): Promise<Principal | null>;
+  /** Tenant-scoped slug lookup (slugs are unique per tenant); null when absent. */
+  getPrincipalBySlug(tenantId: Ulid, slug: string): Promise<Principal | null>;
+  /** Every tenant (the sentinel boot sweep iterates these). */
+  listTenants(): Promise<Tenant[]>;
 }
 
 const policyEngine = stubService<PolicyEngine>(

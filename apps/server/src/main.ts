@@ -33,7 +33,12 @@ import {
   createUnconfiguredProcessEngine,
   subscribeProcessEngine,
 } from "./processes";
-import { createWatcherHost } from "./sentinel";
+import {
+  attachSentinel,
+  createRaiseFindingTool,
+  createUnconfiguredWatcherHost,
+  createWatcherHost,
+} from "./sentinel";
 import { createSkillRegistry } from "./skills";
 import { createSorRuntime } from "./sor";
 import { createClock, createEventSpine } from "./spine";
@@ -104,7 +109,7 @@ export async function boot(): Promise<void> {
       ? createContextStore(db, spine, contextDepsFromConfig(config))
       : createUnconfiguredContextStore();
 
-  // P7-agents wiring.
+  // P7-agents wiring (+ P13-sentinel: raise_finding rides the extra-tool seam).
   const agents =
     db !== undefined && spine !== undefined && workQueue !== undefined
       ? createAgentsRuntime({
@@ -114,6 +119,13 @@ export async function boot(): Promise<void> {
           identity: createIdentityService(db, spine),
           workQueue,
           contextStore,
+          ...(humanGate !== undefined
+            ? {
+                extraTools: [
+                  createRaiseFindingTool({ humanGate, identity: createIdentityService(db, spine) }),
+                ],
+              }
+            : {}),
         })
       : undefined;
 
@@ -171,7 +183,10 @@ export async function boot(): Promise<void> {
     skillRegistry: createSkillRegistry(),
     artifactEngine: createArtifactEngine(),
     sorRuntime: createSorRuntime(),
-    watcherHost: createWatcherHost(),
+    watcherHost:
+      db !== undefined && spine !== undefined
+        ? createWatcherHost({ identity: createIdentityService(db, spine), contextStore, config })
+        : createUnconfiguredWatcherHost(),
   };
 
 if (db !== undefined && spine !== undefined && clock !== undefined) {
@@ -236,6 +251,18 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   }
 
   if ((config.role === "orchestrator" || config.role === "all") && spine !== undefined) {
+    // P13-sentinel: mint + host the default watcher fleet and bridge watched
+    // events into owned WorkItems wherever the dispatcher runs.
+    if (db !== undefined && workQueue !== undefined && agents !== undefined) {
+      await attachSentinel({
+        spine,
+        identity: createIdentityService(db, spine),
+        watcherHost: services.watcherHost,
+        agentHost: agents.host,
+        workQueue,
+      });
+      console.log("sentinel: default watchers resident; event→work bridge attached");
+    }
     spine.startDispatcher();
     clock?.start();
     console.log("orchestrator loops running: spine dispatcher (300ms poll), clock (30s tick)");
