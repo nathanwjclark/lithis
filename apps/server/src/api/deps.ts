@@ -2,6 +2,7 @@ import type { Connection, Ulid } from "@lithis/core";
 import type { ContextStore } from "../context";
 import type { Delivery } from "../delivery";
 import type { HumanGate } from "../humangate";
+import type { SkillRegistry } from "../skills";
 import type { WorkQueue } from "../work";
 import type { ServerRole } from "../config";
 
@@ -19,6 +20,8 @@ export interface ApiDeps {
   contextStore: ContextStore;
   /** Absent when the server runs without a database — delivery routes answer 503. */
   delivery?: Delivery;
+  /** Absent when the server runs without a database — skills routes answer 503. */
+  skills?: SkillRegistry;
   /** Resolves the tenant's slack connection for the inbound events ingress. */
   slackConnectionFor?: (tenantId: Ulid) => Promise<Connection | undefined>;
   /** Injectable for tests; defaults to construction time. */

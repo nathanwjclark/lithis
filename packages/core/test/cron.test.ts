@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cronMatches, cronSchema } from "@lithis/core";
+import { cronMatches, cronNext, cronSchema } from "@lithis/core";
 
 // Local-time dates: (year, monthIndex, day, hour, minute)
 const d = (y: number, mo: number, day: number, h: number, mi: number) =>
@@ -68,5 +68,40 @@ describe("cronMatches", () => {
     for (const expr of ["* * * * *", "0 9 * * 1-5", "*/15 * * * *", "0 0 1,15 * *"]) {
       expect(cronSchema.safeParse(expr).success).toBe(true);
     }
+  });
+});
+
+describe("cronNext", () => {
+  test("advances to the next matching minute, strictly after `after`", () => {
+    // Every-minute cron: next fire is exactly one minute later.
+    const next = cronNext("* * * * *", d(2026, 7, 14, 9, 30));
+    expect(next?.getHours()).toBe(9);
+    expect(next?.getMinutes()).toBe(31);
+  });
+
+  test("weekday cadence skips the weekend", () => {
+    // 2026-07-17 is a Friday; the next 09:00 weekday fire is Monday 07-20.
+    const next = cronNext("0 9 * * 1-5", d(2026, 7, 17, 9, 0));
+    expect(next?.getDay()).toBe(1); // Monday
+    expect(next?.getDate()).toBe(20);
+    expect(next?.getHours()).toBe(9);
+    expect(next?.getMinutes()).toBe(0);
+  });
+
+  test("a matching `after` minute is NOT returned (strictly after)", () => {
+    const next = cronNext("30 9 * * *", d(2026, 7, 14, 9, 30));
+    expect(next?.getDate()).toBe(15); // tomorrow, not the same minute
+  });
+
+  test("sub-minute precision is floored before stepping", () => {
+    const after = new Date(2026, 6, 14, 9, 29, 45, 500);
+    const next = cronNext("30 9 * * *", after);
+    expect(next?.getMinutes()).toBe(30);
+    expect(next?.getSeconds()).toBe(0);
+  });
+
+  test("bounded scan: an expression that cannot fire within 60 days is undefined", () => {
+    // Feb 30 never exists.
+    expect(cronNext("0 0 30 2 *", d(2026, 7, 14, 0, 0))).toBeUndefined();
   });
 });

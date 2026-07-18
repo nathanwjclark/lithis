@@ -26,6 +26,11 @@ describe("linkedin-outreach manifest", () => {
 
 describe("linkedin-outreach run (stub)", () => {
   test("throws NotImplementedError", () => {
-    expect(() => run({ segmentQuery: "nj insurance brokerage partners" })).toThrow(NotImplementedError);
+    expect(() =>
+      run(
+        { segmentQuery: "nj insurance brokerage partners" },
+        { tenantId: "01ARZ3NDEKTSV4RRFFQ69G5FAV", now: "2026-07-16T09:00:00.000Z" },
+      ),
+    ).toThrow(NotImplementedError);
   });
 });

@@ -207,6 +207,21 @@ export function createPgHumanGate(db: Db, spine: EventSpine): HumanGate {
       });
     },
 
+    async listPending(
+      tenantId: Ulid,
+      f?: Pick<InboxFilter, "kinds" | "subjectKinds">,
+    ): Promise<HumanRequest[]> {
+      const rows: HumanRequestRow[] = await db.sql`
+        select * from humangate.human_requests
+        where tenant_id = ${tenantId} and state = 'pending'
+        order by created_at, id`;
+      return rows.map(rowToHumanRequest).filter((r) => {
+        if (f?.kinds !== undefined && !f.kinds.includes(r.kind)) return false;
+        if (f?.subjectKinds !== undefined && !f.subjectKinds.includes(r.subjectKind)) return false;
+        return true;
+      });
+    },
+
     async supersedeForSubject(tenantId: Ulid, subject: Ref, causeEventId?: Ulid): Promise<Ulid[]> {
       return await db.withTx(async (tx) => {
         const sql = txSql(tx);

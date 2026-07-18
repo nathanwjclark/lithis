@@ -27,7 +27,7 @@ import {
   createUnconfiguredDelivery,
 } from "./delivery";
 import { createHumanGate, slaTickSource } from "./humangate";
-import { createIdentityService, createPolicyEngine } from "./iam";
+import { createIdentityService, createPolicyEngine, findDevSeed } from "./iam";
 import {
   createProcessEngine,
   createUnconfiguredProcessEngine,
@@ -39,7 +39,15 @@ import {
   createUnconfiguredWatcherHost,
   createWatcherHost,
 } from "./sentinel";
-import { createSkillRegistry } from "./skills";
+import {
+  createSkillRuntime,
+  createSkillsService,
+  createUnconfiguredSkillRegistry,
+  ensureDevSkillsSeed,
+} from "./skills";
+import { followUpCadenceManifest, run as followUpCadenceRun } from "@lithis/skill-follow-up-cadence";
+import { linkedinOutreachManifest, run as linkedinOutreachRun } from "@lithis/skill-linkedin-outreach";
+import { weeklyReportManifest, run as weeklyReportRun } from "@lithis/skill-weekly-report";
 import { createSorRuntime } from "./sor";
 import { createClock, createEventSpine } from "./spine";
 import { createLeaseReclaimTickSource, createWorkQueue } from "./work";
@@ -109,26 +117,6 @@ export async function boot(): Promise<void> {
       ? createContextStore(db, spine, contextDepsFromConfig(config))
       : createUnconfiguredContextStore();
 
-  // P7-agents wiring (+ P13-sentinel: raise_finding rides the extra-tool seam).
-  const agents =
-    db !== undefined && spine !== undefined && workQueue !== undefined
-      ? createAgentsRuntime({
-          db,
-          spine,
-          config,
-          identity: createIdentityService(db, spine),
-          workQueue,
-          contextStore,
-          ...(humanGate !== undefined
-            ? {
-                extraTools: [
-                  createRaiseFindingTool({ humanGate, identity: createIdentityService(db, spine) }),
-                ],
-              }
-            : {}),
-        })
-      : undefined;
-
   // P6-deliver wiring.
   const delivery =
     db !== undefined && spine !== undefined && connectivity !== undefined && humanGate !== undefined
@@ -145,6 +133,55 @@ export async function boot(): Promise<void> {
             : {}),
         })
       : createUnconfiguredDelivery();
+  const deliveryReal =
+    db !== undefined && spine !== undefined && connectivity !== undefined && humanGate !== undefined;
+
+  // P10-skills wiring: the in-process registration seam (no dynamic code
+  // loading) — every extension skill this build ships registers here.
+  const skillRuntime = createSkillRuntime();
+  const skillSource = (slug: string) => ({
+    repo: "nathanwjclark/lithis",
+    ref: "main",
+    path: `extensions/skills/${slug}`,
+  });
+  skillRuntime.register({ slug: "weekly-report", kind: "report", manifest: weeklyReportManifest, run: weeklyReportRun, sourceRef: skillSource("weekly-report") });
+  skillRuntime.register({ slug: "follow-up-cadence", kind: "workflow", manifest: followUpCadenceManifest, run: followUpCadenceRun, sourceRef: skillSource("follow-up-cadence") });
+  skillRuntime.register({ slug: "linkedin-outreach", kind: "workflow", manifest: linkedinOutreachManifest, run: linkedinOutreachRun, sourceRef: skillSource("linkedin-outreach") });
+  const skills =
+    db !== undefined && spine !== undefined && workQueue !== undefined && humanGate !== undefined
+      ? createSkillsService({
+          db,
+          spine,
+          runtime: skillRuntime,
+          humanGate,
+          workQueue,
+          config,
+          ...(connectivity !== undefined ? { connections: connectivity.connectionRegistry } : {}),
+          ...(deliveryReal ? { delivery } : {}),
+        })
+      : undefined;
+
+  // P7-agents wiring (+ P13-sentinel: raise_finding rides the extra-tool
+  // seam; P10-skills: manifest tools execute through the skill executor).
+  const agents =
+    db !== undefined && spine !== undefined && workQueue !== undefined
+      ? createAgentsRuntime({
+          db,
+          spine,
+          config,
+          identity: createIdentityService(db, spine),
+          workQueue,
+          contextStore,
+          ...(skills !== undefined ? { skills: skills.toolExecutor } : {}),
+          ...(humanGate !== undefined
+            ? {
+                extraTools: [
+                  createRaiseFindingTool({ humanGate, identity: createIdentityService(db, spine) }),
+                ],
+              }
+            : {}),
+        })
+      : undefined;
 
   // Instantiate all module services so the census below is complete.
   const services = {
@@ -180,7 +217,7 @@ export async function boot(): Promise<void> {
           toolBroker: createToolBroker(),
         }),
     delivery,
-    skillRegistry: createSkillRegistry(),
+    skillRegistry: skills !== undefined ? skills.registry : createUnconfiguredSkillRegistry(),
     artifactEngine: createArtifactEngine(),
     sorRuntime: createSorRuntime(),
     watcherHost:
@@ -197,6 +234,29 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   }
   if (clock !== undefined && agents !== undefined) {
     clock.registerSource(agents.heartbeatTickSource);
+  }
+  if (clock !== undefined && skills !== undefined) {
+    clock.registerSource(skills.scheduleTickSource);
+  }
+  // P10 dev-seed activation (dev tenant ONLY — prod activates via the API):
+  // the seed skills walk the REAL propose → approve → activate lifecycle so
+  // cron ticks fire locally out of the box.
+  if (db !== undefined && skills !== undefined) {
+    const devSeed = await findDevSeed(db);
+    if (devSeed !== undefined) {
+      try {
+        const { activated } = await ensureDevSkillsSeed({
+          registry: skills.registry,
+          runtime: skillRuntime,
+          humanGate: humanGate!,
+          tenantId: devSeed.tenantId,
+          principalId: devSeed.principalId,
+        });
+        if (activated.length > 0) console.log(`dev seed: activated skills ${activated.join(", ")}`);
+      } catch (err) {
+        console.error(`dev seed: skill activation failed — ${err instanceof Error ? err.message : err}`);
+      }
+    }
   }
   if (spine !== undefined && workQueue !== undefined && humanGate !== undefined) {
     subscribeProcessEngine(spine, services.processEngine);
@@ -220,8 +280,6 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   // P6-deliver: card + reply consumers ride the spine wherever the dispatcher
   // runs; the Socket Mode client is the inbound Slack transport when an
   // app-level token is configured (honest degrade to the HTTP ingress otherwise).
-  const deliveryReal =
-    db !== undefined && spine !== undefined && connectivity !== undefined && humanGate !== undefined;
   if (deliveryReal) {
     attachDeliverySubscriptions(spine!, delivery);
   }
@@ -275,6 +333,7 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
 ...(services.humanGate !== undefined ? { humanGate: services.humanGate } : {}),
       ...(services.workQueue !== undefined ? { workQueue: services.workQueue } : {}),
       contextStore: services.contextStore,
+      ...(skills !== undefined ? { skills: skills.registry } : {}),
       ...(deliveryReal
         ? {
             delivery,

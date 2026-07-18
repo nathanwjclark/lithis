@@ -137,6 +137,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
         "@lithis/stubkit": "workspace:*",
       },
     },
@@ -145,6 +146,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
         "@lithis/stubkit": "workspace:*",
       },
     },
@@ -153,6 +155,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@lithis/core": "workspace:*",
+        "@lithis/sdk": "workspace:*",
         "@lithis/stubkit": "workspace:*",
       },
     },

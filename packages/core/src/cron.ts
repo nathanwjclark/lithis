@@ -58,6 +58,26 @@ function matches(parsed: Set<number> | "any", value: number): boolean {
   return parsed === "any" || parsed.has(value);
 }
 
+/** How many minutes ahead cronNext scans before giving up (60 days). */
+const CRON_NEXT_SCAN_MINUTES = 60 * 24 * 60;
+
+/**
+ * The next minute strictly after `after` at which the expression fires, or
+ * undefined when nothing matches within the (bounded) 60-day scan window —
+ * enough for any real cadence; a cron that cannot fire for two months is
+ * treated as never-firing rather than looping forever. Minute-stepping over
+ * cronMatches keeps this trivially consistent with the tick sources.
+ */
+export function cronNext(expr: Cron, after: Date): Date | undefined {
+  const base = new Date(after);
+  base.setSeconds(0, 0);
+  for (let i = 1; i <= CRON_NEXT_SCAN_MINUTES; i++) {
+    const candidate = new Date(base.getTime() + i * 60_000);
+    if (cronMatches(expr, candidate)) return candidate;
+  }
+  return undefined;
+}
+
 /** Does this cron expression fire at this date's minute? */
 export function cronMatches(expr: Cron, date: Date): boolean {
   const fields = expr.trim().split(/\s+/);

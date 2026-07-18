@@ -18,6 +18,24 @@ export interface DevSeed {
   created: boolean;
 }
 
+/**
+ * Lookup-only twin of ensureDevSeed: the dev tenant + dev-admin principal
+ * when both exist, undefined otherwise. Boot-time consumers (the P10 dev
+ * skill activation) use this so a production database — which has no `dev`
+ * tenant — is never seeded as a side effect of booting.
+ */
+export async function findDevSeed(db: Db): Promise<DevSeed | undefined> {
+  const tenantRows: { id: string }[] = await db.sql`
+    select id from iam.tenants where slug = 'dev'`;
+  const tenantId = tenantRows[0]?.id;
+  if (tenantId === undefined) return undefined;
+  const principalRows: { id: string }[] = await db.sql`
+    select id from iam.principals where tenant_id = ${tenantId} and slug = 'dev-admin'`;
+  const principalId = principalRows[0]?.id;
+  if (principalId === undefined) return undefined;
+  return { tenantId, principalId, created: false };
+}
+
 export async function ensureDevSeed(identity: IdentityService, db: Db): Promise<DevSeed> {
   const tenantRows: { id: string }[] = await db.sql`
     select id from iam.tenants where slug = 'dev'`;
