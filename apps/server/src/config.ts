@@ -37,6 +37,10 @@ const envSchema = z.object({
   LITHIS_AGENT_MODEL: z.string().min(1).optional(),
   /** Rerun cascades wider than this gate as HumanRequest{cascade_plan} (processes module, default 3). */
   LITHIS_CASCADE_AUTO_WIDTH: z.coerce.number().int().positive().optional(),
+  /** Sealed browser profiles root (custody browser profile store, default ~/.lithis/profiles). */
+  LITHIS_BROWSER_PROFILE_DIR: z.string().min(1).optional(),
+  /** Headed Chrome executable the browserhost pod drives; default = standard install paths. */
+  LITHIS_CHROME_BINARY: z.string().min(1).optional(),
   /** Slack delivery + inbound Socket Mode (delivery module + slack connector). */
   SLACK_BOT_TOKEN: z.string().min(1).optional(),
   SLACK_APP_TOKEN: z.string().min(1).optional(),
@@ -64,6 +68,8 @@ export interface ServerConfig {
   distillModel?: string;
   agentModel?: string;
   cascadeAutoWidth?: number;
+  browserProfileDir?: string;
+  chromeBinary?: string;
   slackBotToken?: string;
   slackAppToken?: string;
   slackDeliveryChannel?: string;
@@ -96,6 +102,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     ...(parsed.LITHIS_AGENT_MODEL !== undefined ? { agentModel: parsed.LITHIS_AGENT_MODEL } : {}),
     ...(parsed.LITHIS_CASCADE_AUTO_WIDTH !== undefined
       ? { cascadeAutoWidth: parsed.LITHIS_CASCADE_AUTO_WIDTH }
+      : {}),
+    ...(parsed.LITHIS_BROWSER_PROFILE_DIR !== undefined
+      ? { browserProfileDir: parsed.LITHIS_BROWSER_PROFILE_DIR }
+      : {}),
+    ...(parsed.LITHIS_CHROME_BINARY !== undefined
+      ? { chromeBinary: parsed.LITHIS_CHROME_BINARY }
       : {}),
     ...(parsed.SLACK_BOT_TOKEN !== undefined ? { slackBotToken: parsed.SLACK_BOT_TOKEN } : {}),
     ...(parsed.SLACK_APP_TOKEN !== undefined ? { slackAppToken: parsed.SLACK_APP_TOKEN } : {}),

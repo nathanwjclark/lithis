@@ -1,6 +1,7 @@
-import { z } from "zod";
 import type { Ulid } from "@lithis/core";
-import { stubService } from "@lithis/stubkit";
+import { createRealBrowserHostService } from "./host";
+import type { BrowserHostDeps } from "./host";
+import type { HumanizationPolicy } from "./policy";
 
 /**
  * @lithis/browserhost — headed-Chrome session pods.
@@ -9,46 +10,33 @@ import { stubService } from "@lithis/stubkit";
  * these pods; agents drive Chrome through a brokered CDP endpoint and never
  * see cookie material. Humanization is timing-only, and CAPTCHAs pause the
  * session and notify a human — they are never auto-solved.
+ *
+ * REAL as of P12-browser: the pod runtime (host.ts — unseal → launch →
+ * broker → re-seal), the Chrome process seam (launcher.ts), the CDP broker
+ * (broker.ts) and its allow/deny policy (cdp-policy.ts). Object-storage-backed
+ * profile sealing lands with the GCP deploy (P15); today custody hands the pod
+ * a local sealed-profile directory.
  */
-
-/**
- * Timing-only humanization policy — REAL config, zod-validated. This is the
- * whole humanization surface: pacing. No synthetic mouse curves, no
- * fingerprint spoofing, and `captcha` is a literal: pause + notify a human.
- */
-export const humanizationPolicySchema = z
-  .object({
-    /** Minimum delay between actions, in milliseconds. */
-    minDelayMs: z.number().int().nonnegative(),
-    /** Uniform random jitter added on top of minDelayMs. */
-    jitterMs: z.number().int().nonnegative(),
-    /** Hard hourly cap on actions per mounted session. */
-    maxActionsPerHour: z.number().int().positive(),
-    /** [min, max] dwell time on a page before the next action, in milliseconds. */
-    dwellMsRange: z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()]),
-    /** The only supported CAPTCHA behavior — lithis never auto-solves. */
-    captcha: z.literal("pause_and_notify"),
-  })
-  .refine((p) => p.dwellMsRange[0] <= p.dwellMsRange[1], {
-    message: "dwellMsRange must be [min, max] with min <= max",
-    path: ["dwellMsRange"],
-  });
-export type HumanizationPolicy = z.infer<typeof humanizationPolicySchema>;
-
-/** Conservative shipped default: slow, bounded, human-paced. */
-export const defaultHumanizationPolicy: HumanizationPolicy = humanizationPolicySchema.parse({
-  minDelayMs: 1_200,
-  jitterMs: 2_500,
-  maxActionsPerHour: 40,
-  dwellMsRange: [2_000, 15_000],
-  captcha: "pause_and_notify",
-});
 
 /** A mounted (unsealed-into-pod) browser session. */
 export interface BrowserSessionHandle {
   sessionId: Ulid;
   /** Credential the profile was unsealed from — for re-sealing on release. */
   credentialRef: Ulid;
+  /** The pod this session is resident in. */
+  podId: string;
+}
+
+/**
+ * What custody hands the pod to mount a session. The pod never resolves
+ * credentials itself: custody owns the credential → sealed-profile mapping
+ * (see apps/server/src/custody/browserprofiles.ts) and the pod owns the
+ * unseal/re-seal mechanics.
+ */
+export interface MountRequest {
+  credentialRef: Ulid;
+  /** Directory holding the SEALED profile. Copied in on mount, back out on release. */
+  sealedProfileDir: string;
 }
 
 /** Brokered CDP attachment — scoped, capability-checked, event-emitting. */
@@ -60,9 +48,11 @@ export interface CdpAttachment {
 
 /** The pod runtime the server's custody + agents modules program against. */
 export interface BrowserHostService {
+  /** This pod's identifier, reported back to custody on every mount. */
+  podId: string;
   /** Unseal a custody browser_session credential into a fresh headed-Chrome pod. */
-  mountSession(credentialRef: Ulid): Promise<BrowserSessionHandle>;
-  /** Attach to a mounted session via the CDP broker. */
+  mountSession(request: MountRequest): Promise<BrowserSessionHandle>;
+  /** Attach to a mounted session via the CDP broker (single-use brokered URL). */
   attach(sessionId: Ulid): Promise<CdpAttachment>;
   /** Re-seal the profile back into custody and tear the pod down. */
   release(sessionId: Ulid): Promise<void>;
@@ -70,11 +60,36 @@ export interface BrowserHostService {
   policy(): HumanizationPolicy;
 }
 
-/** Pod runtime not implemented in the skeleton — every method throws. */
-export function createBrowserHostService(): BrowserHostService {
-  return stubService<BrowserHostService>(
-    "browserhost.host",
-    ["mountSession", "attach", "release", "policy"],
-    "LITHIS-STUB: headed-Chrome session pods (custody profile mount, CDP broker, humanized pacing) not implemented — build-out phase 7",
-  );
+/**
+ * Build the pod runtime. `deps.launcher` is the only mandatory piece — pass
+ * createSystemChromeLauncher() in production, a fake in tests (the suite never
+ * requires a real browser).
+ */
+export function createBrowserHostService(deps: BrowserHostDeps): BrowserHostService {
+  return createRealBrowserHostService(deps);
 }
+
+export { defaultHumanizationPolicy, humanizationPolicySchema } from "./policy";
+export type { HumanizationPolicy } from "./policy";
+export { UnknownSessionError } from "./host";
+export type { BrowserHostDeps, BrowserHostEvent } from "./host";
+export {
+  CHROME_BINARY_ENV,
+  DEFAULT_CHROME_BINARIES,
+  chromeLaunchArgs,
+  createSystemChromeLauncher,
+  parseDevToolsEndpoint,
+  resolveChromeBinary,
+} from "./launcher";
+export type { ChromeLaunchHandle, ChromeLauncher } from "./launcher";
+export { createCdpBroker } from "./broker";
+export type { CdpBroker, CdpBrokerDenial, CdpBrokerOptions } from "./broker";
+export {
+  CDP_ALLOWED_METHODS,
+  CDP_DENIED_DOMAINS,
+  CDP_DENIED_METHODS,
+  cdpDenialError,
+  decideCdpCommand,
+  decideCdpMethod,
+} from "./cdp-policy";
+export type { CdpCommand, CdpDecision, CdpDenyRule } from "./cdp-policy";

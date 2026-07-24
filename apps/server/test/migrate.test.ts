@@ -51,10 +51,19 @@ describe("collectMigrations (real filesystem)", () => {
 
   test("every migration is real DDL with the tenancy + timestamp conventions", () => {
     for (const m of plan) {
-      expect(m.sql).toContain("create table if not exists");
-      expect(m.sql).toContain("tenant_id");
-      expect(m.sql).toContain("timestamptz");
-      expect(m.sql).toContain(`create schema if not exists`);
+      if (m.file === "000_init.sql") {
+        // An init migration stands up its module's schema + tables.
+        expect(m.sql).toContain("create schema if not exists");
+        expect(m.sql).toContain("create table if not exists");
+        expect(m.sql).toContain("tenant_id");
+        expect(m.sql).toContain("timestamptz");
+        continue;
+      }
+      // Follow-up migrations may create tables OR evolve existing ones — what
+      // they may never be is empty/placeholder DDL.
+      expect(/\b(create table|alter table|create index|create unique index)\b/.test(m.sql)).toBe(
+        true,
+      );
     }
   });
 

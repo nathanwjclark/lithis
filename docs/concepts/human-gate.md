@@ -65,6 +65,22 @@ node reruns with `trigger.cause: 'denial'|'modification'`.
 ActionIntents, individual verdicts. This is the difference between autonomy
 and approval fatigue.
 
+> **Implemented in P12-browser** (the `iam` module owns `iam.action_intents`):
+> `proposeBatch` writes N intents sharing a `batchId` at status `proposed` and
+> opens ONE `HumanRequest{action_batch}` whose pinned payload
+> (`actionBatchPayloadSchema`) carries per-item capability, params, counterpart
+> and a one-line summary. A spine consumer on `humangate.resolved` applies the
+> `perItem` verdicts (falling back to the batch verdict when a reviewer answers
+> wholesale), then executes the approved/modified items through an injected
+> `ActionExecutor` — in production, `connector.act` resolved from the intent's
+> capability. Each executed item records an immutable Evidence receipt and
+> stores it in `receiptRef`; failures land as `failed` with a receipt saying
+> why, never as a silent retry. Per-item application is guarded on
+> `status = 'proposed'`, so at-least-once redelivery cannot double-send.
+> Routes: `POST /api/iam/action-batches`, `GET /api/iam/action-batches/:id`,
+> `POST /api/iam/action-batches/:id/execute`. There is deliberately no route
+> that executes an intent outside a resolved batch.
+
 ## SLA is internal-only
 
 `routing.slaHours`, follow-ups, and `escalationPath` apply to **internal

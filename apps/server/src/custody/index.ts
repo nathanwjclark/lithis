@@ -1,9 +1,11 @@
 import type { Credential, IsoDateTime, PrincipalContext, Ref, Ulid } from "@lithis/core";
-import { stub } from "@lithis/stubkit";
 import type { Db } from "../db";
 import type { EventSpine } from "../spine";
 import { createCustodyBroker } from "./broker";
+import type { BrowserProfileStore } from "./browserprofiles";
 import { createEnvFileBackend } from "./envfile";
+import { createMountSession, createReleaseSession } from "./mount";
+import type { BrowserHostPort } from "./mount";
 
 /**
  * custody — the credential broker. Agents NEVER see raw secrets: they get
@@ -13,7 +15,9 @@ import { createEnvFileBackend } from "./envfile";
  * the GCP reference deploy).
  *
  * Real as of P3-connect: getBrokered/issueFor/redeem over the env-file
- * backend. mountSession stays a loud stub until the browserhost lands (P12).
+ * backend. Real as of P12-browser: mountSession over the custody browser
+ * profile store + an injected BrowserHostPort (custody never imports
+ * apps/browserhost internals).
  */
 
 export type CredentialRef = Ulid;
@@ -37,15 +41,23 @@ export interface BrowserHostRef {
 
 export interface SessionMount {
   credentialId: Ulid;
+  /** The browserhost-assigned session id — release()/attach() key off this. */
+  sessionId: Ulid;
   host: BrowserHostRef;
-  /** CDP endpoint the broker exposes to the pod — profile bytes stay sealed. */
+  /** BROKERED CDP url (single-use token) — never the pod's raw DevTools endpoint. */
   cdpUrl: string;
   mountedAt: IsoDateTime;
 }
 
 export interface Custody {
   getBrokered(ref: CredentialRef, p: PrincipalContext): Promise<BrokeredAuth>;
-  mountSession(ref: CredentialRef, host: BrowserHostRef): Promise<SessionMount>;
+  /**
+   * Unseal a `browser_session` credential into a browserhost pod. The pod is
+   * the injected BrowserHostPort — callers no longer name one (the P3-era
+   * `host: BrowserHostRef` argument was always vestigial; the pod that
+   * actually served the mount comes back on the SessionMount).
+   */
+  mountSession(ref: CredentialRef, p: PrincipalContext): Promise<SessionMount>;
 }
 
 /** What redeeming a brokerToken yields — server-side connector-runtime use ONLY; never log or serialize. */
@@ -71,6 +83,14 @@ export interface CustodyDeps {
   spine: EventSpine;
   credentials: CredentialLookup;
   backend: CustodyBackend;
+  /**
+   * Where SEALED browser profiles live. Absent → mountSession fails with a
+   * clear configuration error (honest degrade, not a stub: browser sessions
+   * are simply not configured on this deployment).
+   */
+  profiles?: BrowserProfileStore;
+  /** The browserhost pod runtime. Absent → mountSession fails the same way. */
+  browserHost?: BrowserHostPort;
   /** Broker token time-to-live in ms (default 15 minutes). */
   ttlMs?: number;
   /** Injectable clock for expiry tests. */
@@ -83,15 +103,50 @@ export interface CustodyRuntime extends Custody {
   issueFor(credentialId: CredentialRef, tenantId: Ulid, actor: Ref): Promise<BrokeredAuth>;
   /** Exchange a live brokerToken for the secret material — in-process, connector-runtime only. */
   redeem(brokerToken: string): Promise<RedeemedSecret>;
+  /** Re-seal a mounted browser session and tear its pod down. */
+  releaseSession(sessionId: Ulid, credentialRef: CredentialRef, p: PrincipalContext): Promise<void>;
 }
 
-const mountSession = stub<Custody["mountSession"]>(
-  "server.custody.broker.mountSession",
-  "LITHIS-STUB: sealed browser-session mounting not implemented — browser_session credentials mount only into browserhost pods (P12-browser)",
-);
+/**
+ * Honest CONFIG degrade (the context-store precedent): a deployment without a
+ * browser profile store or a browserhost pod cannot mount sealed sessions, and
+ * says so. Not a stub — the real implementation lives in ./mount.ts and is
+ * wired whenever both seams are supplied.
+ */
+function unconfiguredBrowserSessions(): never {
+  throw new Error(
+    "sealed browser sessions unavailable: this server was built without a browser profile store " +
+      "and/or a browserhost pod (set LITHIS_BROWSER_PROFILE_DIR and wire @lithis/browserhost)",
+  );
+}
 
 export function createCustody(deps: CustodyDeps): CustodyRuntime {
-  return createCustodyBroker(deps, mountSession);
+  const browserSessionsConfigured =
+    deps.profiles !== undefined && deps.browserHost !== undefined;
+  const mountDeps = browserSessionsConfigured
+    ? {
+        db: deps.db,
+        spine: deps.spine,
+        credentials: deps.credentials,
+        profiles: deps.profiles!,
+        browserHost: deps.browserHost!,
+      }
+    : undefined;
+  return createCustodyBroker(deps, {
+    mountSession:
+      mountDeps !== undefined ? createMountSession(mountDeps) : unconfiguredBrowserSessions,
+    releaseSession:
+      mountDeps !== undefined ? createReleaseSession(mountDeps) : unconfiguredBrowserSessions,
+  });
 }
 
 export { createEnvFileBackend };
+export {
+  BROWSER_PROFILE_REF_PREFIX,
+  DEFAULT_BROWSER_PROFILE_DIR,
+  createLocalBrowserProfileStore,
+  profileKeyFromRef,
+} from "./browserprofiles";
+export type { BrowserProfileStore } from "./browserprofiles";
+export { NotABrowserSessionError } from "./mount";
+export type { BrowserHostPort } from "./mount";

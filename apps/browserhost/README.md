@@ -27,6 +27,36 @@ ever unsealed.
 
 ## Status
 
-Skeleton. The `HumanizationPolicy` schema and `defaultHumanizationPolicy` are
-real; the `BrowserHostService` implementation is a registered stub
-(`browserhost.host.*`) until build-out phase 7 (browserhost + linkedin pack).
+Real as of **P12-browser**. There are no stubs left in this package.
+
+| Piece | File | What it does |
+|---|---|---|
+| Pod runtime | `src/host.ts` | mount (unseal → launch) / attach (broker) / release (re-seal → delete pod) |
+| Chrome seam | `src/launcher.ts` | spawns the system Chrome with `--remote-debugging-port=0 --user-data-dir=<pod dir>`, reads the DevTools endpoint off stderr |
+| CDP broker | `src/broker.ts` | Bun websocket proxy with a single-use token; refused commands get a CDP error + a reported denial |
+| Broker policy | `src/cdp-policy.ts` | allow-list ∪ hard deny-list (cookies, DOM/IndexedDB/CacheStorage storage, request interception, devtools escape hatches) |
+| Policy config | `src/policy.ts` | `humanizationPolicySchema` + `defaultHumanizationPolicy` |
+
+The tests never require a real browser: the `ChromeLauncher` is injected, and
+the broker is exercised against a scripted upstream websocket.
+
+### Configuration
+
+- `LITHIS_CHROME_BINARY` — the headed Chrome/Chromium executable. Unset falls
+  back to the standard macOS/Linux install paths; nothing found is a loud
+  error at mount time, never a silent degrade.
+- Sealed profiles are resolved by **custody**, not by this package
+  (`LITHIS_BROWSER_PROFILE_DIR`, default `~/.lithis/profiles`, one directory
+  per credential). Object-storage-backed sealing lands with P15-gcp.
+
+### Known residual risk
+
+`Runtime.evaluate` is on the allow-list — navigating and extracting requires
+page scripting, and page script can read JS-visible (non-`httpOnly`) cookies.
+The broker scans evaluate/callFunctionOn payloads for `document.cookie`,
+`localStorage`, `sessionStorage`, `indexedDB` and `navigator.credentials` as
+defense in depth, but that is a guard, not a sandbox. The session cookies that
+matter (LinkedIn's `li_at`, most portal auth) are `httpOnly` and unreachable
+from page script by construction; what the deny-list closes is every
+*wholesale profile export* path. A fine-grained expression/capability policy
+belongs with the policy layer (ADR-006).
