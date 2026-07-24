@@ -1,7 +1,7 @@
-import { newUlid, nowIso } from "@lithis/core";
-import type { Cost, Ulid } from "@lithis/core";
+import { evidenceSchema, newUlid, nowIso } from "@lithis/core";
+import type { Cost, Evidence, Ulid } from "@lithis/core";
 import { txSql } from "../db";
-import type { Db } from "../db";
+import type { Db, DbTx } from "../db";
 import type { EventSpine } from "../spine";
 import type { ContextStore } from "../context";
 import type { AgentRunOutcome, WakeReason } from "./index";
@@ -24,6 +24,90 @@ export const ZERO_COST: Cost = { tokensIn: 0, tokensOut: 0, usd: 0 };
 
 export function addCost(a: Cost, b: Cost): Cost {
   return { tokensIn: a.tokensIn + b.tokensIn, tokensOut: a.tokensOut + b.tokensOut, usd: a.usd + b.usd };
+}
+
+// ── evidence (the agents module owns agents.evidence) ───────────────────────
+
+/** An Evidence record before the store assigns id/tenant/timestamps. */
+export type EvidenceDraft = Omit<Evidence, "id" | "tenantId" | "createdAt" | "updatedAt">;
+
+/**
+ * Append one immutable Evidence row INSIDE the caller's transaction. Evidence
+ * rows live in this module's table, so every producer outside agents (P11's
+ * artifact render/verify, and any later phase minting evidence without an
+ * agent run) writes through this narrow surface rather than reaching across
+ * the module boundary. Rows are never updated — a correction is a new record.
+ */
+export async function insertEvidence(
+  tx: DbTx,
+  tenantId: Ulid,
+  draft: EvidenceDraft,
+): Promise<Evidence> {
+  const at = nowIso();
+  const evidence = evidenceSchema.parse({
+    ...draft,
+    id: newUlid(),
+    tenantId,
+    createdAt: at,
+    updatedAt: at,
+  });
+  await txSql(tx)`
+    insert into agents.evidence
+      (id, tenant_id, run_id, produced_by, kind, sources, summary, blob_ids,
+       content_hash, at, created_at, updated_at)
+    values
+      (${evidence.id}, ${evidence.tenantId}, ${evidence.runId ?? null},
+       ${JSON.stringify(evidence.producedBy)}::text::jsonb, ${evidence.kind},
+       ${JSON.stringify(evidence.sources)}::text::jsonb, ${evidence.summary},
+       ${JSON.stringify(evidence.blobIds)}::text::jsonb, ${evidence.contentHash},
+       ${evidence.at}, ${at}, ${at})`;
+  return evidence;
+}
+
+interface EvidenceRow {
+  id: string;
+  tenant_id: string;
+  run_id: string | null;
+  produced_by: unknown;
+  kind: string;
+  sources: unknown;
+  summary: string;
+  blob_ids: unknown;
+  content_hash: string;
+  at: Date | string;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
+/** Tenant-scoped point read of one Evidence row (citation rendering, tests). */
+export async function getEvidence(
+  db: Db,
+  tenantId: Ulid,
+  id: Ulid,
+): Promise<Evidence | undefined> {
+  const rows: EvidenceRow[] = await db.sql`
+    select * from agents.evidence where id = ${id} and tenant_id = ${tenantId}`;
+  const row = rows[0];
+  if (row === undefined) return undefined;
+  const parse = (v: unknown): unknown => (typeof v === "string" ? JSON.parse(v) : v);
+  return evidenceSchema.parse({
+    id: row.id,
+    tenantId: row.tenant_id,
+    ...(row.run_id !== null ? { runId: row.run_id } : {}),
+    producedBy: parse(row.produced_by),
+    kind: row.kind,
+    sources: parse(row.sources),
+    summary: row.summary,
+    blobIds: parse(row.blob_ids),
+    contentHash: row.content_hash,
+    at: toIso(row.at),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  });
+}
+
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : value;
 }
 
 // ── transcripts ─────────────────────────────────────────────────────────────

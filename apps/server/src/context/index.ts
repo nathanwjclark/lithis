@@ -85,6 +85,13 @@ export interface RankedPath {
 export interface ContextStore {
   /** Content-addressed (sha256) + deduped per tenant; emits context.blob.created. */
   putBlob(b: NewBlob, bytes: Uint8Array): Promise<BlobRef>;
+  /**
+   * The read side of putBlob — bytes for a blob THIS tenant owns (throws when
+   * the blob is unknown to the tenant, so a mis-scoped read can never return
+   * another tenant's content). Added in P11: template bodies and rendered
+   * artifact outputs live in blobs, so rendering needs to read them back.
+   */
+  readBlob(tenantId: Ulid, blobId: Ulid): Promise<Uint8Array>;
   /** Quarantined by default; builds the deterministic index; emits context.doc.created. */
   ingestDoc(d: NewDoc): Promise<DocRef>;
   /** ONE LLM pass → summary + entities + links; emits context.doc.distilled. */
@@ -150,5 +157,5 @@ export function createUnconfiguredContextStore(): ContextStore {
       "context store unavailable: DATABASE_URL is not set — the server is running in DB-less skeleton mode",
     );
   };
-  return { putBlob: fail, ingestDoc: fail, distill: fail, search: fail, paths: fail };
+  return { putBlob: fail, readBlob: fail, ingestDoc: fail, distill: fail, search: fail, paths: fail };
 }

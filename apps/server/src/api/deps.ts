@@ -1,8 +1,10 @@
 import type { Connection, Ulid } from "@lithis/core";
+import type { ArtifactEngine } from "../artifacts";
 import type { ContextStore } from "../context";
 import type { Delivery } from "../delivery";
 import type { HumanGate } from "../humangate";
 import type { SkillRegistry } from "../skills";
+import type { SorRuntime } from "../sor";
 import type { WorkQueue } from "../work";
 import type { ServerRole } from "../config";
 
@@ -22,6 +24,10 @@ export interface ApiDeps {
   delivery?: Delivery;
   /** Absent when the server runs without a database — skills routes answer 503. */
   skills?: SkillRegistry;
+  /** Absent when the server runs without a database — artifacts routes answer 503. */
+  artifacts?: ArtifactEngine;
+  /** Absent when the server runs without a database — sor routes answer 503. */
+  sor?: SorRuntime;
   /** Resolves the tenant's slack connection for the inbound events ingress. */
   slackConnectionFor?: (tenantId: Ulid) => Promise<Connection | undefined>;
   /** Injectable for tests; defaults to construction time. */

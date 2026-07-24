@@ -14,6 +14,9 @@ const searchCalls: unknown[] = [];
 const fixtureDocId = newUlid();
 const fakeContextStore: ContextStore = {
   putBlob: async () => ({ kind: "blob", id: fixtureDocId }),
+  readBlob: async () => {
+    throw new Error("not exercised by api tests");
+  },
   ingestDoc: async () => ({ kind: "doc", id: fixtureDocId }),
   distill: async () => {
     throw new Error("not exercised by api tests");
@@ -85,6 +88,22 @@ describe("placeholder domain routes answer 501 with the stub id", () => {
   test("POST /api/work/claim → 503 when the server has no database", async () => {
     const res = await app.request("/api/work/claim", { method: "POST", headers: identity });
     expect(res.status).toBe(503);
+  });
+
+  test("artifacts + sor routes (P11) → 503 when the server has no database", async () => {
+    // Both modules are REAL as of P11; without a database their routes report the
+    // missing CONFIGURATION, which is a different failure from a stub's 501.
+    for (const path of ["/api/artifacts/templates", "/api/sor"]) {
+      expect((await app.request(path, { headers: identity })).status).toBe(503);
+    }
+    for (const path of ["/api/artifacts/render", "/api/sor/propose"]) {
+      const res = await app.request(path, {
+        method: "POST",
+        headers: { ...identity, "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(503);
+    }
   });
 });
 

@@ -127,7 +127,9 @@ export function createPgContextStore(
   spine: EventSpine,
   deps: ContextStoreDeps,
 ): ContextStore {
-  async function readBlobText(tenantId: string, blobId: string): Promise<string> {
+  async function readBlobBytes(tenantId: string, blobId: string): Promise<Uint8Array> {
+    // Tenant scoping is in the WHERE clause, not a post-filter: a blob id from
+    // another tenant reads as "not found", never as bytes.
     const rows: { storage_ref: string }[] = await db.sql`
       select storage_ref from context.blobs
       where id = ${blobId} and tenant_id = ${tenantId}`;
@@ -135,10 +137,18 @@ export function createPgContextStore(
     if (row === undefined) {
       throw new Error(`blob ${blobId} not found in tenant ${tenantId}`);
     }
-    return new TextDecoder().decode(await deps.blobs.get(row.storage_ref));
+    return await deps.blobs.get(row.storage_ref);
+  }
+
+  async function readBlobText(tenantId: string, blobId: string): Promise<string> {
+    return new TextDecoder().decode(await readBlobBytes(tenantId, blobId));
   }
 
   return {
+    async readBlob(tenantId: string, blobId: string): Promise<Uint8Array> {
+      return await readBlobBytes(tenantId, blobId);
+    },
+
     async putBlob(b: NewBlob, bytes: Uint8Array): Promise<BlobRef> {
       const hasher = new Bun.CryptoHasher("sha256");
       hasher.update(bytes);

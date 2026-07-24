@@ -49,12 +49,30 @@ describe("collectMigrations (real filesystem)", () => {
     }
   });
 
-  test("every migration is real DDL with the tenancy + timestamp conventions", () => {
-    for (const m of plan) {
+  test("every 000_init is real DDL with the tenancy + timestamp conventions", () => {
+    for (const m of plan.filter((f) => f.file === "000_init.sql")) {
       expect(m.sql).toContain("create table if not exists");
       expect(m.sql).toContain("tenant_id");
       expect(m.sql).toContain("timestamptz");
       expect(m.sql).toContain(`create schema if not exists`);
+    }
+  });
+
+  /**
+   * Follow-on migrations are not required to create tables (P11's
+   * sor/001_applied_state.sql only adds columns) — but they must still be real,
+   * idempotent DDL, never an empty or comment-only file that silently "applies".
+   */
+  test("follow-on migrations are real, idempotent DDL", () => {
+    for (const m of plan.filter((f) => f.file !== "000_init.sql")) {
+      const statements = m.sql
+        .split("\n")
+        .filter((line) => !line.trimStart().startsWith("--"))
+        .join("\n")
+        .trim();
+      expect(statements.length).toBeGreaterThan(0);
+      expect(statements).toMatch(/\b(create|alter|drop|insert|update)\b/i);
+      expect(statements).toMatch(/if (not )?exists/i);
     }
   });
 

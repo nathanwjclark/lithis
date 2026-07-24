@@ -91,6 +91,7 @@ export const evidenceSourceSchema = z.object({
   excerpt: z.string().optional(),
   whyRelevant: z.string().min(1),
 });
+export type EvidenceSource = z.infer<typeof evidenceSourceSchema>;
 
 export const evidenceSchema = z.object({
   ...recordBase,

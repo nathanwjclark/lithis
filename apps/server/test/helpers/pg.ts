@@ -95,6 +95,25 @@ export async function truncateAll(db: Db): Promise<void> {
       delivery.deliveries,
       skills.skills,
       skills.skill_versions,
-      skills.skill_runs
+      skills.skill_runs,
+      artifacts.templates,
+      artifacts.artifacts,
+      sor.sor_descriptors
     cascade`;
+  await dropGeneratedSorSchemas(db);
+}
+
+/**
+ * SoR migrations mint REAL per-tenant Postgres schemas (`sor_{tenant}_{slug}`)
+ * outside the migration ledger, so truncating tables is not enough — a second
+ * run in the same database would otherwise hit `create table` on an existing
+ * table. Every schema this harness drops was created by a test tenant.
+ */
+export async function dropGeneratedSorSchemas(db: Db): Promise<void> {
+  const rows: { nspname: string }[] = await db.sql`
+    select nspname from pg_namespace where nspname like 'sor\\_%'`;
+  for (const row of rows) {
+    // The name came from pg_catalog and matched the sor_ prefix filter; quote it anyway.
+    await db.sql.unsafe(`drop schema if exists "${row.nspname.replace(/"/g, '""')}" cascade`);
+  }
 }

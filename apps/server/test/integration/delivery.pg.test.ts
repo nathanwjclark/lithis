@@ -436,6 +436,7 @@ describePg("delivery (integration)", () => {
         (await rig.registry.findByConnector("slack", tenantId))[0],
       contextStore: {
         putBlob: () => Promise.reject(new Error("unused")),
+        readBlob: () => Promise.reject(new Error("unused")),
         ingestDoc: () => Promise.reject(new Error("unused")),
         distill: () => Promise.reject(new Error("unused")),
         search: () => Promise.reject(new Error("unused")),
