@@ -13,6 +13,7 @@
       "@lithis/skill-weekly-report": ["extensions/skills/weekly-report/src/index.ts"],
       "@lithis/skill-follow-up-cadence": ["extensions/skills/follow-up-cadence/src/index.ts"],
       "@lithis/skill-linkedin-outreach": ["extensions/skills/linkedin-outreach/src/index.ts"],
+      "@lithis/pack-insurance-brokerage": ["extensions/packs/insurance-brokerage/src/index.ts"],
       "@lithis/cli": ["packages/cli/src/index.ts"]
     }
   },

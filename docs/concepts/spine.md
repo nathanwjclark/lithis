@@ -34,7 +34,7 @@ catalog lives in `packages/core/src/topics/` (one file per domain):
 | runs | `run.started` · `run.finished` |
 | conversations | `conversation.message` |
 | connectivity | `connector.sync.completed` · `connection.health.changed` · `feed.expectation.missed` |
-| skills / artifacts / sor | `skill.version.proposed` · `skill.version.activated` · `artifact.rendered` · `artifact.verified` · `sor.migration.proposed` · `sor.migration.applied` |
+| skills / artifacts / sor | `skill.version.proposed` · `skill.version.activated` · `artifact.template.created` · `artifact.template.change_proposed` · `artifact.rendered` · `artifact.verified` · `sor.migration.proposed` · `sor.migration.applied` · `sor.row.written` |
 | delivery / workspace | `delivery.sent` · `workspace.status_changed` |
 | agents | `agent.woke` · `agent.slept` |
 

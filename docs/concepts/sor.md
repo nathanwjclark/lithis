@@ -25,8 +25,10 @@ today even though the runtime is stubbed.
 
 ## The structural columns
 
-Generated tables live in `sor_{tenant}_{slug}` Postgres schemas. Every table
-gets two reserved columns (underscore-prefixed names are reserved for lithis;
+Generated tables live in `sor_{tenant}_{slug}` Postgres schemas (the tenant
+ULID lowercased; a slug that would overflow Postgres' 63-byte identifier limit
+is rejected, never truncated). Every table gets a reserved `_id` primary key
+plus two reserved columns (underscore-prefixed names are reserved for lithis;
 user columns can't start with `_`):
 
 - **`_entityRef`** — the CRM-style tight link back to a context entity
@@ -41,17 +43,40 @@ user columns can't start with `_`):
 Schema changes to a live system-of-record are exactly the kind of thing an
 autonomous agent must not do silently:
 
-1. `SorRuntime.propose(draft)` → `sor.migration.proposed` +
+1. `SorRuntime.propose(draft, p)` → `sor.migration.proposed` +
    `HumanRequest{subjectKind:'sor_migration'}` (the DDL is in the payload,
-   rendered for review).
-2. On approval, `apply(descriptorId)` runs the migration and records
+   rendered for review, and stored as a blob so the card cites immutable bytes).
+2. On approval, `apply(descriptorId, p)` runs the migration **in one
+   transaction with its audit write** and records
    `{ version, sqlBlobId, appliedBy: 'agent'|'human', approvalRequestId,
    appliedAt }` — the audit trail is in the descriptor itself, and
    `sor.migration.applied` lands on the spine.
 
+The descriptor's `tables` are what it **declares**; the runtime separately
+tracks what has actually been **applied**, and diffs proposals against the
+applied set — a denied or still-pending proposal can never be mistaken for live
+schema.
+
+**v1 is additive only.** New tables and new *nullable* columns apply; dropping
+a table or column, changing a column's type, tightening nullability, and adding
+a NOT NULL column to a populated table are rejected with an explicit list of
+the offending changes. They need a data-migration plan and their own gate.
+
+Descriptors are DATA — packs ship them, agents draft them — so every
+descriptor-supplied identifier is treated as hostile input: re-validated
+against a strict `^[a-z][a-z0-9_]*$` regex at DDL time and always quoted, with
+descriptor prose escaped as a SQL literal.
+
 ## Access
 
-No raw SQL surface. `SorRuntime.table(system, name)` returns a scoped,
-tenant-schema-bound table handle; writes stamp `_origin` and (where bound)
-`_entityRef`. Externally-visible SoR writes ride the same ActionIntent /
+No raw SQL surface. `SorRuntime.table(system, name, p)` returns a scoped,
+tenant-schema-bound table handle — the `PrincipalContext` is an explicit
+parameter, because tenancy and provenance are caller facts, not ambient state.
+Every identifier the handle emits comes from the *applied* descriptor and is
+quoted; every value is a bound parameter; unknown columns and reserved names
+throw, and an empty `where` on `update` is refused rather than rewriting the
+table. Writes stamp `_origin`, and `_entityRef` when the caller supplies it
+(resolving an `entityBinding` value to an entity id automatically needs an
+exact context lookup surface that does not exist yet — a registered stub, not
+a guess). Externally-visible SoR writes ride the same ActionIntent /
 HumanRequest gating as any other risky action.

@@ -98,13 +98,15 @@ export interface ToolBroker {
 
 /**
  * The agent memory notebook (charter.memoryBlobId) — read at every wake,
- * appended by the agent — is NOT implemented: the ContextStore exposes no
- * blob-read surface yet, so briefs are assembled without it. Registered here
- * so the census shows the gap; nothing calls it.
+ * appended by the agent — is NOT implemented: briefs are still assembled
+ * without it. (P11 added ContextStore.readBlob, so the read half is now
+ * unblocked; what is missing is append-and-compact semantics and the
+ * charter.memoryBlobId wiring in the host.) Registered so the census shows
+ * the gap; nothing calls it.
  */
 export const readAgentMemory = stub<(tenantId: Ulid, memoryBlobId: Ulid) => Promise<string>>(
   "server.agents.host.memory",
-  "LITHIS-STUB: agent memory notebook read/append not implemented (ContextStore has no blob-read surface yet)",
+  "LITHIS-STUB: agent memory notebook not implemented — no append/compact semantics and charter.memoryBlobId is not wired into brief assembly",
 );
 
 export interface AgentsRuntimeDeps {
@@ -207,6 +209,14 @@ export function createToolBroker(): ToolBroker {
   return createCharterToolBroker();
 }
 
+/**
+ * The evidence write/read surface (agents owns `agents.evidence`). Published
+ * so other modules that legitimately mint Evidence without an agent run —
+ * P11's artifact verification, which IS Evidence — never touch this module's
+ * tables directly.
+ */
+export { getEvidence, insertEvidence, sha256Hex } from "./store";
+export type { EvidenceDraft } from "./store";
 export { DEFAULT_AGENT_MODEL, createAnthropicComplete } from "./executor";
 export type { CompleteFn, ModelTurn, CompleteRequest } from "./executor";
 export {

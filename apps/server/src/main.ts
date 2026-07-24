@@ -8,7 +8,7 @@ import {
   createUnconfiguredAgentExecutor,
   createUnconfiguredAgentHost,
 } from "./agents";
-import { createArtifactEngine } from "./artifacts";
+import { createArtifactEngine, createUnconfiguredArtifactEngine } from "./artifacts";
 import {
   createConnectionRegistry,
   createConnectorRuntime,
@@ -48,7 +48,7 @@ import {
 import { followUpCadenceManifest, run as followUpCadenceRun } from "@lithis/skill-follow-up-cadence";
 import { linkedinOutreachManifest, run as linkedinOutreachRun } from "@lithis/skill-linkedin-outreach";
 import { weeklyReportManifest, run as weeklyReportRun } from "@lithis/skill-weekly-report";
-import { createSorRuntime } from "./sor";
+import { createSorRuntime, createUnconfiguredSorRuntime } from "./sor";
 import { createClock, createEventSpine } from "./spine";
 import { createLeaseReclaimTickSource, createWorkQueue } from "./work";
 
@@ -183,6 +183,10 @@ export async function boot(): Promise<void> {
         })
       : undefined;
 
+  // P11-artifacts-sor wiring: both compose over db/spine/humangate/context.
+  const artifacts = db !== undefined && spine !== undefined && humanGate !== undefined ? createArtifactEngine({ db, spine, humanGate, contextStore, config }) : undefined;
+  const sorRuntime = db !== undefined && spine !== undefined && humanGate !== undefined ? createSorRuntime({ db, spine, humanGate, contextStore }) : undefined;
+
   // Instantiate all module services so the census below is complete.
   const services = {
     ...(spine !== undefined ? { eventSpine: spine } : {}),
@@ -218,8 +222,8 @@ export async function boot(): Promise<void> {
         }),
     delivery,
     skillRegistry: skills !== undefined ? skills.registry : createUnconfiguredSkillRegistry(),
-    artifactEngine: createArtifactEngine(),
-    sorRuntime: createSorRuntime(),
+    artifactEngine: artifacts ?? createUnconfiguredArtifactEngine(),
+    sorRuntime: sorRuntime ?? createUnconfiguredSorRuntime(),
     watcherHost:
       db !== undefined && spine !== undefined
         ? createWatcherHost({ identity: createIdentityService(db, spine), contextStore, config })
@@ -334,6 +338,8 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
       ...(services.workQueue !== undefined ? { workQueue: services.workQueue } : {}),
       contextStore: services.contextStore,
       ...(skills !== undefined ? { skills: skills.registry } : {}),
+      ...(artifacts !== undefined ? { artifacts } : {}),
+      ...(sorRuntime !== undefined ? { sor: sorRuntime } : {}),
       ...(deliveryReal
         ? {
             delivery,
