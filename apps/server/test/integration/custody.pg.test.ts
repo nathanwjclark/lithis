@@ -161,9 +161,17 @@ describePg("Custody broker (integration)", () => {
     expect(unconfigured.getBrokered(missing.id, p)).rejects.toThrow(/LITHIS_SECRETS_FILE is not set/);
   });
 
-  test("mountSession remains a loud stub", async () => {
-    const { custody } = await setup();
-    const err = expectStub(() => custody.mountSession(newUlid(), { podId: "pod-1" }));
-    expect(err.stubId).toBe("server.custody.broker.mountSession");
+  test("mountSession refuses non-browser_session credentials", async () => {
+    const { custody, credentials, tenantId, p } = await setup();
+    const apiKey = await credentials.create({
+      tenantId,
+      kind: "api_key",
+      custodyBackendRef: "env-file:FAKE_SLACK_TOKEN",
+    });
+    // Browser sessions are unconfigured in this suite (no profile store / pod),
+    // so the config guard fires first — honestly, never silently.
+    expect(() => custody.mountSession(apiKey.id, p)).toThrow(
+      /sealed browser sessions unavailable/,
+    );
   });
 });

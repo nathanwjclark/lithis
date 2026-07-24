@@ -5,6 +5,7 @@ import type { ApiDeps } from "./deps";
 import { mountContextRoutes } from "./routes/context";
 import { mountDeliveryRoutes } from "./routes/delivery";
 import { mountHumangateRoutes } from "./routes/humangate";
+import { mountIamRoutes } from "./routes/iam";
 import { mountSkillsRoutes } from "./routes/skills";
 import { mountWorkRoutes } from "./routes/work";
 
@@ -53,6 +54,7 @@ export function buildApp(deps: ApiDeps): Hono {
   mountContextRoutes(app, deps);
   mountDeliveryRoutes(app, deps);
   mountSkillsRoutes(app, deps);
+  mountIamRoutes(app, deps);
 
   return app;
 }

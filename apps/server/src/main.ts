@@ -19,7 +19,8 @@ import {
 } from "./connections";
 import { contextDepsFromConfig, createContextStore, createUnconfiguredContextStore } from "./context";
 import { createSlackConnector } from "@lithis/connector-slack";
-import { createCustody, createEnvFileBackend } from "./custody";
+import { createBrowserHostService, createSystemChromeLauncher } from "@lithis/browserhost";
+import { createCustody, createEnvFileBackend, createLocalBrowserProfileStore } from "./custody";
 import {
   attachDeliverySubscriptions,
   createDelivery,
@@ -27,7 +28,15 @@ import {
   createUnconfiguredDelivery,
 } from "./delivery";
 import { createHumanGate, slaTickSource } from "./humangate";
-import { createIdentityService, createPolicyEngine, findDevSeed } from "./iam";
+import {
+  attachActionIntents,
+  createActionIntentService,
+  createConnectorActionExecutor,
+  createIdentityService,
+  createPolicyEngine,
+  findDevSeed,
+} from "./iam";
+import { createEvidenceWriter } from "./agents";
 import {
   createProcessEngine,
   createUnconfiguredProcessEngine,
@@ -85,11 +94,22 @@ export async function boot(): Promise<void> {
   const connectivity = (() => {
     if (db === undefined || spine === undefined) return undefined;
     const credentials = createCredentialDirectory(db, spine);
+    // P12-browser: sealed browser profiles + the headed-Chrome pod runtime.
+    // The pod is constructed lazily-safely (no browser is spawned until a
+    // session is actually mounted) and the binary is resolved at launch time,
+    // so a server without Chrome boots fine and fails loudly only on mount.
+    const browserHost = createBrowserHostService({
+      launcher: createSystemChromeLauncher(
+        config.chromeBinary !== undefined ? { binaryPath: config.chromeBinary } : {},
+      ),
+    });
     const custody = createCustody({
       db,
       spine,
       credentials,
       backend: createEnvFileBackend(config.secretsFile),
+      profiles: createLocalBrowserProfileStore(config.browserProfileDir),
+      browserHost,
     });
     const authProvider = {
       getAuth: async (connection: import("@lithis/core").Connection) => {
@@ -104,7 +124,7 @@ export async function boot(): Promise<void> {
     const connectorRuntime = createConnectorRuntime(authProvider);
     connectorRuntime.register(createSlackConnector); // P6-deliver: slack is a first-class citizen of every db-backed boot
     const connectionRegistry = createConnectionRegistry(db, spine, { probes: connectorRuntime });
-    return { custody, authProvider, connectorRuntime, connectionRegistry };
+    return { custody, authProvider, connectorRuntime, connectionRegistry, browserHost };
   })();
 
   // Hoisted shared services: delivery composes over humangate/context/
@@ -116,6 +136,29 @@ export async function boot(): Promise<void> {
     db !== undefined && spine !== undefined
       ? createContextStore(db, spine, contextDepsFromConfig(config))
       : createUnconfiguredContextStore();
+
+  // P12-browser wiring: ActionIntent batches (propose → gate → per-item
+  // verdicts → execute with receipts). The executor is the connector runtime,
+  // so an approved LinkedIn connect reaches the browser pod the same way a
+  // Slack post reaches chat.write.
+  const actions =
+    db !== undefined && spine !== undefined && humanGate !== undefined
+      ? createActionIntentService({
+          db,
+          spine,
+          gate: humanGate,
+          evidence: createEvidenceWriter(db),
+          ...(connectivity !== undefined
+            ? {
+                executor: createConnectorActionExecutor({
+                  runtime: connectivity.connectorRuntime,
+                  connections: connectivity.connectionRegistry,
+                  auth: connectivity.authProvider,
+                }),
+              }
+            : {}),
+        })
+      : undefined;
 
   // P6-deliver wiring.
   const delivery =
@@ -209,6 +252,7 @@ export async function boot(): Promise<void> {
           })
         : createUnconfiguredProcessEngine(),
     ...(humanGate !== undefined ? { humanGate } : {}),
+    ...(actions !== undefined ? { actionIntents: actions } : {}),
     ...(agents !== undefined
       ? { agentHost: agents.host, agentExecutor: agents.executor, toolBroker: agents.toolBroker }
       : {
@@ -260,6 +304,9 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
   }
   if (spine !== undefined && workQueue !== undefined && humanGate !== undefined) {
     subscribeProcessEngine(spine, services.processEngine);
+  }
+  if (spine !== undefined && actions !== undefined) {
+    attachActionIntents(spine, actions);
   }
 
   console.log(`lithis server — role=${config.role} port=${config.port}`);
@@ -334,6 +381,7 @@ if (db !== undefined && spine !== undefined && clock !== undefined) {
       ...(services.workQueue !== undefined ? { workQueue: services.workQueue } : {}),
       contextStore: services.contextStore,
       ...(skills !== undefined ? { skills: skills.registry } : {}),
+      ...(actions !== undefined ? { actions } : {}),
       ...(deliveryReal
         ? {
             delivery,

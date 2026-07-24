@@ -25,3 +25,4 @@ export * from "./topics/sor";
 export * from "./topics/delivery";
 export * from "./topics/workspace";
 export * from "./topics/agent";
+export * from "./topics/browser";

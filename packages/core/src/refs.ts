@@ -20,6 +20,8 @@ export const REF_KINDS = [
   "evidence",
   "human_request",
   "action_intent",
+  /** A group of ActionIntents reviewed as ONE HumanRequest (shared batchId). */
+  "action_batch",
   "connection",
   "credential",
   "skill",

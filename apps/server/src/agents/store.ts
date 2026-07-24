@@ -1,5 +1,5 @@
 import { newUlid, nowIso } from "@lithis/core";
-import type { Cost, Ulid } from "@lithis/core";
+import type { Cost, Evidence, IsoDateTime, Ref, Ulid } from "@lithis/core";
 import { txSql } from "../db";
 import type { Db } from "../db";
 import type { EventSpine } from "../spine";
@@ -57,6 +57,52 @@ export function transcriptStoreFromContext(contextStore: ContextStore): Transcri
         bytes,
       );
       return ref.id;
+    },
+  };
+}
+
+// ── evidence ────────────────────────────────────────────────────────────────
+
+/**
+ * A narrow, additive evidence-write surface for producers that are NOT agent
+ * runs — deterministic checks and executors mint citable evidence too (see
+ * Evidence.producedBy: "a principal or a run"). The agents module owns the
+ * table, so the write goes through here rather than a cross-module reach.
+ */
+export interface EvidenceDraft {
+  runId?: Ulid;
+  /** A principal or a run — never a bare string. */
+  producedBy: Ref;
+  kind: Evidence["kind"];
+  sources: Evidence["sources"];
+  summary: string;
+  blobIds?: Ulid[];
+  /** Immutable content address; sha256Hex over the canonical payload. */
+  contentHash: string;
+  at: IsoDateTime;
+}
+
+export interface EvidenceWriter {
+  /** Insert one immutable Evidence row; returns its id. */
+  write(tenantId: Ulid, draft: EvidenceDraft): Promise<Ulid>;
+}
+
+export function createPgEvidenceWriter(db: Db): EvidenceWriter {
+  return {
+    async write(tenantId: Ulid, draft: EvidenceDraft): Promise<Ulid> {
+      const id = newUlid();
+      const at = nowIso();
+      await db.sql`
+        insert into agents.evidence
+          (id, tenant_id, run_id, produced_by, kind, sources, summary, blob_ids,
+           content_hash, at, created_at, updated_at)
+        values
+          (${id}, ${tenantId}, ${draft.runId ?? null},
+           ${JSON.stringify(draft.producedBy)}::text::jsonb, ${draft.kind},
+           ${JSON.stringify(draft.sources)}::text::jsonb, ${draft.summary},
+           ${JSON.stringify(draft.blobIds ?? [])}::text::jsonb, ${draft.contentHash},
+           ${draft.at}, ${at}, ${at})`;
+      return id;
     },
   };
 }

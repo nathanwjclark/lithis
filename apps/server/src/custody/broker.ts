@@ -8,8 +8,8 @@ import type { BrokeredAuth, CustodyDeps, CustodyRuntime, RedeemedSecret } from "
  * redemption map lives in-process — the secret never rides the BrokeredAuth,
  * never lands in an event, and never crosses the API. Every issuance emits
  * custody.credential.brokered on the spine (the audit trail the concepts doc
- * demands). mountSession (sealed browser profiles) stays a loud stub until
- * the browserhost lands (P12).
+ * demands). Sealed-browser-session mounting lives in ./mount.ts (P12-browser)
+ * and is composed in here.
  */
 
 export const DEFAULT_BROKER_TTL_MS = 15 * 60 * 1000;
@@ -55,7 +55,7 @@ export function createTokenVault(opts?: { ttlMs?: number; nowMs?: () => number }
 
 export function createCustodyBroker(
   deps: CustodyDeps,
-  mountSession: CustodyRuntime["mountSession"],
+  browser: Pick<CustodyRuntime, "mountSession" | "releaseSession">,
 ): CustodyRuntime {
   const vault = createTokenVault({
     ...(deps.ttlMs !== undefined ? { ttlMs: deps.ttlMs } : {}),
@@ -94,6 +94,7 @@ export function createCustodyBroker(
     async redeem(brokerToken: string): Promise<RedeemedSecret> {
       return vault.redeem(brokerToken);
     },
-    mountSession,
+    mountSession: browser.mountSession,
+    releaseSession: browser.releaseSession,
   };
 }

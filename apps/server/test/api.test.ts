@@ -86,6 +86,23 @@ describe("placeholder domain routes answer 501 with the stub id", () => {
     const res = await app.request("/api/work/claim", { method: "POST", headers: identity });
     expect(res.status).toBe(503);
   });
+
+  test("action-batch routes → 503 when the server has no database", async () => {
+    const propose = await app.request("/api/iam/action-batches", {
+      method: "POST",
+      headers: { ...identity, "content-type": "application/json" },
+      body: JSON.stringify({
+        summary: "connect with prospects",
+        items: [{ capability: "browser.linkedin.connect", summary: "Connect with Jane Roe" }],
+      }),
+    });
+    expect(propose.status).toBe(503);
+    const execute = await app.request(`/api/iam/action-batches/${newUlid()}/execute`, {
+      method: "POST",
+      headers: identity,
+    });
+    expect(execute.status).toBe(503);
+  });
 });
 
 describe("context routes are real", () => {

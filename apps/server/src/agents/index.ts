@@ -18,8 +18,8 @@ import { createAnthropicComplete, createRunExecutor, DEFAULT_AGENT_MODEL } from 
 import type { CompleteFn } from "./executor";
 import { createResidentAgentHost } from "./host";
 import { createCharterToolBroker } from "./toolbroker";
-import { transcriptStoreFromContext } from "./store";
-import type { TranscriptStore } from "./store";
+import { createPgEvidenceWriter, transcriptStoreFromContext } from "./store";
+import type { EvidenceWriter, TranscriptStore } from "./store";
 
 /**
  * agents — resident, openclaw-style agents: long-lived daemons with durable
@@ -207,6 +207,18 @@ export function createToolBroker(): ToolBroker {
   return createCharterToolBroker();
 }
 
+/**
+ * The agents module owns the evidence table, so non-run producers (the
+ * ActionIntent executor's receipts, deterministic checks) mint their citable
+ * rows through this narrow, additive surface rather than reaching across the
+ * module boundary. Added in P12-browser.
+ */
+export function createEvidenceWriter(db: Db): EvidenceWriter {
+  return createPgEvidenceWriter(db);
+}
+
+export { sha256Hex } from "./store";
+export type { EvidenceDraft, EvidenceWriter } from "./store";
 export { DEFAULT_AGENT_MODEL, createAnthropicComplete } from "./executor";
 export type { CompleteFn, ModelTurn, CompleteRequest } from "./executor";
 export {
